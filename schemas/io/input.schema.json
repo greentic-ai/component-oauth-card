@@ -1,12 +1,63 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "component-oauth-card handle input",
+  "title": "component-oauth-card input",
   "type": "object",
-  "required": ["input"],
+  "required": ["mode", "provider_id", "subject"],
   "properties": {
-    "input": {
+    "mode": {
       "type": "string",
-      "description": "Opaque payload forwarded to handle"
+      "description": "Operation mode for the OAuth card flow",
+      "enum": [
+        "status-card",
+        "start-sign-in",
+        "complete-sign-in",
+        "ensure-token",
+        "disconnect"
+      ]
+    },
+    "provider_id": {
+      "type": "string",
+      "description": "Logical provider identifier, e.g. msgraph, google, github"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Logical subject/user identifier this card refers to"
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Optional tenant identifier for routing/context"
+    },
+    "team": {
+      "type": "string",
+      "description": "Optional team identifier for routing/context"
+    },
+    "scopes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Requested OAuth scopes",
+      "default": []
+    },
+    "state_id": {
+      "type": "string",
+      "description": "Correlation handle for ongoing sign-in flows"
+    },
+    "auth_code": {
+      "type": "string",
+      "description": "Authorization code to complete sign-in (complete-sign-in mode)"
+    },
+    "allow_auto_sign_in": {
+      "type": "boolean",
+      "description": "If true, ensure-token may return a sign-in card automatically",
+      "default": false
+    },
+    "redirect_path": {
+      "type": "string",
+      "description": "Optional redirect path (path-only) used when constructing consent URLs"
+    },
+    "extra_json": {
+      "description": "Provider-specific JSON options forwarded to the broker",
+      "type": ["object", "null"],
+      "additionalProperties": true
     }
   }
 }

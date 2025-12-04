@@ -1,14 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "component-oauth-card component configuration",
+  "title": "component-oauth-card configuration",
+  "description": "No component-level configuration is required for oauth-card.",
   "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "echo_prefix": {
-      "type": "string",
-      "description": "Prefix prepended to every handle response",
-      "default": "component-oauth-card",
-      "x-default-applied": true
-    }
-  }
+  "additionalProperties": true
 }

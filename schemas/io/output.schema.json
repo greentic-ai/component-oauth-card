@@ -1,12 +1,125 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "component-oauth-card handle output",
+  "title": "component-oauth-card output",
   "type": "object",
-  "required": ["message"],
   "properties": {
-    "message": {
+    "status": {
       "type": "string",
-      "description": "Response returned by the handle entry point"
+      "enum": ["ok", "needs-sign-in", "error"],
+      "description": "Result of the requested mode"
+    },
+    "card": {
+      "type": ["object", "null"],
+      "description": "MessageCard payload aligned with gsm-core messaging_card types",
+      "properties": {
+        "kind": { "type": "string", "enum": ["standard", "oauth"] },
+        "title": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"] },
+        "footer": { "type": ["string", "null"] },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string" },
+              "alt": { "type": ["string", "null"] }
+            },
+            "required": ["url"]
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "OpenUrl or PostBack action",
+            "oneOf": [
+              {
+                "properties": {
+                  "type": { "const": "open_url" },
+                  "title": { "type": "string" },
+                  "url": { "type": "string" }
+                },
+                "required": ["type", "title", "url"]
+              },
+              {
+                "properties": {
+                  "type": { "const": "post_back" },
+                  "title": { "type": "string" },
+                  "data": { "type": "object", "additionalProperties": true }
+                },
+                "required": ["type", "title", "data"]
+              }
+            ]
+          }
+        },
+        "allow_markdown": { "type": "boolean" },
+        "adaptive": { "type": ["object", "null"], "additionalProperties": true },
+        "oauth": {
+          "type": ["object", "null"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["microsoft", "google", "github", "custom"]
+            },
+            "scopes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            },
+            "resource": { "type": ["string", "null"] },
+            "prompt": { "type": ["string", "null"], "enum": ["none", "consent", "login", null] },
+            "start_url": { "type": ["string", "null"] },
+            "connection_name": { "type": ["string", "null"] },
+            "metadata": { "type": ["object", "null"], "additionalProperties": true }
+          }
+        }
+      }
+    },
+    "auth_context": {
+      "type": ["object", "null"],
+      "description": "Normalized auth context if a token is available",
+      "properties": {
+        "provider_id": { "type": "string" },
+        "subject": { "type": "string" },
+        "email": { "type": "string" },
+        "tenant": { "type": "string" },
+        "team": { "type": "string" },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "expires_at": { "type": "integer", "description": "Unix timestamp (seconds)" }
+      }
+    },
+    "auth_header": {
+      "type": ["object", "null"],
+      "description": "Authorization headers to call downstream APIs",
+      "properties": {
+        "headers": {
+          "type": "array",
+          "description": "Array of [name, value] pairs",
+          "items": {
+            "type": "array",
+            "items": [
+              { "type": "string" },
+              { "type": "string" }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      },
+      "required": ["headers"]
+    },
+    "state_id": {
+      "type": "string",
+      "description": "Correlation handle for sign-in flows"
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if status is error"
     }
-  }
+  },
+  "required": ["status"]
 }
