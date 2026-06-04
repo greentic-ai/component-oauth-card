@@ -95,8 +95,25 @@ pub struct OauthCard {
     pub start_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_name: Option<String>,
+    /// Bot Framework OAuthCard `tokenExchangeResource` — when populated, clients
+    /// (Teams/WebChat) may attempt a silent SSO token exchange instead of
+    /// opening the sign-in URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_exchange_resource: Option<TokenExchangeResource>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
+}
+
+/// Bot Framework `TokenExchangeResource` for single sign-on / silent token
+/// exchange. See learn.microsoft.com OAuthCard.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct TokenExchangeResource {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uri: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -138,6 +155,16 @@ pub struct OAuthCardInput {
     pub exchanged_token: Option<TokenSet>,
     /// Upstream OAuth operation error to surface in blocking states.
     pub oauth_error: Option<String>,
+    /// Current wall-clock time (Unix epoch seconds), injected by the flow/runtime.
+    /// Used to decide whether `current_token` is expired. When absent, tokens
+    /// are treated as fresh (no clock available -> no refresh decision).
+    pub now_unix: Option<u64>,
+    /// Seconds before `expires_at` at which a token is considered due for
+    /// refresh. Defaults to 60s when omitted.
+    pub refresh_skew_seconds: Option<u64>,
+    /// Bot Framework registered connection name for this provider (OAuthCard
+    /// `connectionName`). Echoed into the rendered oauth card.
+    pub connection_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -183,5 +210,9 @@ pub enum OAuthStatus {
     #[default]
     Ok,
     NeedsSignIn,
+    /// A token exists but is expired (or within the refresh skew window). The
+    /// flow should resolve/refresh it via the broker `get-token` op and
+    /// re-invoke the card before continuing.
+    NeedsRefresh,
     Error,
 }

@@ -175,6 +175,26 @@
               "string",
               "null"
             ]
+          },
+          "now_unix": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "refresh_skew_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "connection_name": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -230,6 +250,7 @@
             "enum": [
               "ok",
               "needs-sign-in",
+              "needs-refresh",
               "error"
             ],
             "type": "string"

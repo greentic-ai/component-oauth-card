@@ -4,9 +4,30 @@ use crate::OAuthCardError;
 use crate::broker::OAuthBackend;
 use crate::model::{
     Action, AuthContext, AuthHeader, MessageCard, MessageCardKind, OAuthCardInput, OAuthCardMode,
-    OAuthCardOutput, OAuthStatus, OauthCard, OauthPrompt, OauthProvider, TokenSet,
+    OAuthCardOutput, OAuthStatus, OauthCard, OauthPrompt, OauthProvider, TokenExchangeResource,
+    TokenSet,
 };
 use serde_json::json;
+
+/// Default seconds before `expires_at` at which a token is treated as due for refresh.
+const DEFAULT_REFRESH_SKEW_SECONDS: u64 = 60;
+
+/// Decide whether a resolved token is expired (or within the refresh skew window).
+///
+/// Returns `false` when there is no expiry information or no injected clock
+/// (`now_unix`), so behaviour is unchanged for callers that do not supply a
+/// clock — tokens without a decidable expiry are treated as fresh.
+fn token_needs_refresh(token: &TokenSet, input: &OAuthCardInput) -> bool {
+    match (token.expires_at, input.now_unix) {
+        (Some(expires_at), Some(now)) => {
+            let skew = input
+                .refresh_skew_seconds
+                .unwrap_or(DEFAULT_REFRESH_SKEW_SECONDS);
+            expires_at <= now.saturating_add(skew)
+        }
+        _ => false,
+    }
+}
 
 pub fn handle<B: OAuthBackend>(
     backend: &B,
@@ -28,6 +49,18 @@ fn status_card<B: OAuthBackend>(
     let token = backend.get_token(&input.provider_id, &input.subject, &input.scopes)?;
 
     if let Some(token) = token {
+        if token_needs_refresh(&token, input) {
+            let card = refresh_required_card(input);
+            return Ok(OAuthCardOutput {
+                status: OAuthStatus::NeedsRefresh,
+                can_continue: false,
+                card: Some(card),
+                auth_context: Some(auth_context(input, &token)),
+                auth_header: None,
+                state_id: None,
+                error: None,
+            });
+        }
         let card = connected_card(input, &token, "Connected");
         Ok(OAuthCardOutput {
             status: OAuthStatus::Ok,
@@ -137,6 +170,17 @@ fn ensure_token<B: OAuthBackend>(
     input: &OAuthCardInput,
 ) -> Result<OAuthCardOutput, OAuthCardError> {
     if let Some(token) = backend.get_token(&input.provider_id, &input.subject, &input.scopes)? {
+        if token_needs_refresh(&token, input) {
+            return Ok(OAuthCardOutput {
+                status: OAuthStatus::NeedsRefresh,
+                can_continue: false,
+                card: None,
+                auth_context: Some(auth_context(input, &token)),
+                auth_header: None,
+                state_id: None,
+                error: None,
+            });
+        }
         return Ok(OAuthCardOutput {
             status: OAuthStatus::Ok,
             can_continue: true,
@@ -204,13 +248,15 @@ fn disconnect_card(input: &OAuthCardInput) -> Result<OAuthCardOutput, OAuthCardE
     );
     card.actions
         .push(action("Reconnect", OAuthCardMode::StartSignIn, input, None));
+    let (connection_name, token_exchange_resource) = oauth_connection(input);
     card.oauth = Some(OauthCard {
         provider: provider_from_id(&input.provider_id),
         scopes: input.scopes.clone(),
         resource: None,
         prompt: None,
         start_url: None,
-        connection_name: None,
+        connection_name,
+        token_exchange_resource,
         metadata: Some(json!({
             "provider_id": input.provider_id,
             "subject": input.subject,
@@ -268,6 +314,7 @@ fn sign_in_card_with_message(
         input,
         Some(state_id.to_string()),
     ));
+    let (connection_name, token_exchange_resource) = oauth_connection(input);
     card.oauth = Some(OauthCard {
         provider: provider_from_id(&input.provider_id),
         scopes: input.scopes.clone(),
@@ -278,7 +325,8 @@ fn sign_in_card_with_message(
         } else {
             Some(url.to_string())
         },
-        connection_name: None,
+        connection_name,
+        token_exchange_resource,
         metadata: Some(json!({
             "state_id": state_id,
             "provider_id": input.provider_id,
@@ -310,6 +358,51 @@ fn auth_required_card(
     card
 }
 
+/// Card shown when a token exists but is expired/near-expiry. Signals the flow
+/// to resolve/refresh via the broker `get-token` op; also offers a manual retry.
+fn refresh_required_card(input: &OAuthCardInput) -> MessageCard {
+    let (connection_name, token_exchange_resource) = oauth_connection(input);
+    let mut card = base_card(
+        MessageCardKind::Oauth,
+        Some(format!("Refreshing {} session", input.provider_id)),
+        Some("Your access token has expired. Refreshing before this flow continues.".into()),
+    );
+    card.actions.push(action(
+        "Retry",
+        OAuthCardMode::EnsureToken,
+        input,
+        None,
+    ));
+    card.oauth = Some(OauthCard {
+        provider: provider_from_id(&input.provider_id),
+        scopes: input.scopes.clone(),
+        resource: None,
+        prompt: None,
+        start_url: None,
+        connection_name,
+        token_exchange_resource,
+        metadata: Some(json!({
+            "provider_id": input.provider_id,
+            "subject": input.subject,
+        })),
+    });
+    card
+}
+
+/// Resolve the Bot Framework connection fields (`connectionName` +
+/// `tokenExchangeResource`) for the rendered oauth card. The token-exchange
+/// resource is only emitted when a connection name is configured, signalling
+/// SSO/silent-exchange capability to clients like Teams/WebChat.
+fn oauth_connection(input: &OAuthCardInput) -> (Option<String>, Option<TokenExchangeResource>) {
+    let connection_name = input.connection_name.clone();
+    let token_exchange_resource = connection_name.as_ref().map(|_| TokenExchangeResource {
+        id: None,
+        uri: None,
+        provider_id: Some(input.provider_id.clone()),
+    });
+    (connection_name, token_exchange_resource)
+}
+
 fn connected_card(input: &OAuthCardInput, token: &TokenSet, headline: &str) -> MessageCard {
     let mut card = base_card(
         MessageCardKind::Oauth,
@@ -338,13 +431,15 @@ fn connected_card(input: &OAuthCardInput, token: &TokenSet, headline: &str) -> M
     ));
     card.actions
         .push(action("Disconnect", OAuthCardMode::Disconnect, input, None));
+    let (connection_name, token_exchange_resource) = oauth_connection(input);
     card.oauth = Some(OauthCard {
         provider: provider_from_id(&input.provider_id),
         scopes: input.scopes.clone(),
         resource: None,
         prompt: None,
         start_url: None,
-        connection_name: None,
+        connection_name,
+        token_exchange_resource,
         metadata: Some(json!({
             "expires_at": token.expires_at,
             "provider_id": input.provider_id,
@@ -496,6 +591,9 @@ mod tests {
             consent_url: None,
             exchanged_token: None,
             oauth_error: None,
+            now_unix: None,
+            refresh_skew_seconds: None,
+            connection_name: None,
         }
     }
 
@@ -620,6 +718,96 @@ mod tests {
             action,
             Action::PostBack { title, .. } if title == "Reconnect"
         )));
+    }
+
+    #[test]
+    fn status_card_with_expired_token_requests_refresh() {
+        let backend = TestBackend {
+            token: Some(sample_token()), // expires_at = 42
+            consent_url: String::new(),
+            exchange_error: None,
+            token_error: None,
+        };
+        let mut input = sample_input(OAuthCardMode::StatusCard);
+        input.now_unix = Some(1_000); // well past expiry
+
+        let output = handle(&backend, input).expect("status ok");
+        assert_eq!(output.status, OAuthStatus::NeedsRefresh);
+        assert!(!output.can_continue);
+        // auth_context is surfaced so the flow can drive the refresh, but no
+        // usable auth_header is emitted for a stale token.
+        assert!(output.auth_context.is_some());
+        assert!(output.auth_header.is_none());
+    }
+
+    #[test]
+    fn status_card_with_unexpired_token_stays_connected() {
+        let mut token = sample_token();
+        token.expires_at = Some(10_000);
+        let backend = TestBackend {
+            token: Some(token),
+            consent_url: String::new(),
+            exchange_error: None,
+            token_error: None,
+        };
+        let mut input = sample_input(OAuthCardMode::StatusCard);
+        input.now_unix = Some(100);
+
+        let output = handle(&backend, input).expect("status ok");
+        assert_eq!(output.status, OAuthStatus::Ok);
+        assert!(output.can_continue);
+        assert!(output.auth_header.is_some());
+    }
+
+    #[test]
+    fn ensure_token_with_expired_token_requests_refresh() {
+        let backend = TestBackend {
+            token: Some(sample_token()), // expires_at = 42
+            consent_url: String::new(),
+            exchange_error: None,
+            token_error: None,
+        };
+        let mut input = sample_input(OAuthCardMode::EnsureToken);
+        input.now_unix = Some(1_000);
+
+        let output = handle(&backend, input).expect("ensure ok");
+        assert_eq!(output.status, OAuthStatus::NeedsRefresh);
+        assert!(!output.can_continue);
+        assert!(output.auth_header.is_none());
+    }
+
+    #[test]
+    fn no_clock_treats_token_as_fresh() {
+        let backend = TestBackend {
+            token: Some(sample_token()), // expires_at = 42, but no now_unix supplied
+            consent_url: String::new(),
+            exchange_error: None,
+            token_error: None,
+        };
+        let output =
+            handle(&backend, sample_input(OAuthCardMode::EnsureToken)).expect("ensure ok");
+        assert_eq!(output.status, OAuthStatus::Ok);
+        assert!(output.can_continue);
+    }
+
+    #[test]
+    fn connection_name_populates_bot_framework_fields() {
+        let backend = TestBackend {
+            token: None,
+            consent_url: "https://consent.example".into(),
+            exchange_error: None,
+            token_error: None,
+        };
+        let mut input = sample_input(OAuthCardMode::StartSignIn);
+        input.connection_name = Some("msgraph-conn".into());
+
+        let output = handle(&backend, input).expect("start ok");
+        let oauth = output.card.expect("card").oauth.expect("oauth block");
+        assert_eq!(oauth.connection_name.as_deref(), Some("msgraph-conn"));
+        let ter = oauth
+            .token_exchange_resource
+            .expect("token_exchange_resource present when connection configured");
+        assert_eq!(ter.provider_id.as_deref(), Some("msgraph"));
     }
 
     #[test]

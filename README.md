@@ -81,6 +81,24 @@ The intended behavior is:
 - `consent_url`: URL that starts the sign-in step
 - `exchanged_token`: token returned after exchanging an authorization code
 - `oauth_error`: upstream OAuth error to show to the user
+- `now_unix`: current time (epoch seconds), injected by the flow/runtime so the
+  card can decide whether `current_token` is expired. When omitted, the token is
+  treated as fresh and no refresh is requested.
+- `refresh_skew_seconds`: refresh a token this many seconds before `expires_at`
+  (default 60)
+- `connection_name`: Bot Framework registered connection name; echoed into the
+  rendered oauth card as `connectionName` / `tokenExchangeResource`
+
+### Token refresh
+
+When `current_token` carries an `expires_at` and the flow supplies `now_unix`,
+the card returns `status: "needs-refresh"` with `can_continue: false` once the
+token is at or past expiry (minus `refresh_skew_seconds`). The flow should then
+resolve a fresh token via the Greentic OAuth broker `get-token` op (which
+refreshes using a stored refresh token when `offline_access` was granted) and
+re-invoke the card with the refreshed `current_token`. The component never
+performs the token call itself — its component world (`component@0.6.0`) does
+not import the OAuth broker directly.
 
 ## Configuration
 
@@ -113,7 +131,7 @@ Use `./tools/i18n.sh` to generate or refresh translated locale files.
 
 The main runtime output includes:
 
-- `status`: `ok`, `needs-sign-in`, or `error`
+- `status`: `ok`, `needs-sign-in`, `needs-refresh`, or `error`
 - `can_continue`: whether the flow is allowed to proceed
 - `card`: what to show the user
 - `auth_header`: only present when a usable token is available
