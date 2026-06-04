@@ -124,11 +124,14 @@ dependencies = [
 name = "component-oauth-card"
 version = "0.1.2"
 dependencies = [
+ "anyhow",
+ "base64",
  "ciborium",
  "greentic-interfaces-guest",
  "greentic-types",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "uuid",
 ]

@@ -4,6 +4,10 @@
 *.swp
 *.tmp
 
+# Local runtime cache and live-test artifacts (oauth_live_test runner)
+/.greentic/
+/logs/
+
 # CI workflow artifacts (codex-security-fix, dependency-review, codex-semver-fix)
 all-dependabot-alerts.json
 all-code-scanning-alerts.json

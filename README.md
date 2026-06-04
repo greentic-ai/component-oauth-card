@@ -135,3 +135,30 @@ For a component artifact, manifest hash, and doctor validation:
 make wasm
 make doctor
 ```
+
+## Live OAuth Runner
+
+This repo now includes a typed live OAuth runner that replaces most of the old
+shell orchestration:
+
+- binary: `cargo run --offline --bin oauth_live_test -- <repo-url>`
+- wrapper: `./tools/live_test_oauth_interactive.sh <repo-url>`
+
+The runner keeps the live OAuth path through extension capability calls:
+
+- `oauth.initiate_auth`
+- `oauth.get_access_token`
+
+It also handles:
+
+- runtime start + ngrok URL resolution
+- setup answer apply (`AUTO_APPLY_SETUP=true` by default)
+- callback polling via ngrok inspector
+- commit fetch and `gtc op demo run` card render
+
+Key env vars are kept compatible with the legacy script:
+`TENANT`, `TEAM`, `FLOW_ENV`, `PROVIDER`, `RUNTIME_PROVIDER_ID`,
+`OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_CLIENT_ID_KEY`,
+`OIDC_CLIENT_SECRET_KEY`, `OIDC_AUTH_URL`, `OIDC_TOKEN_URL`,
+`OAUTH_SCOPES_CSV`, `OAUTH_BROKER_CAP_ID`, `SKIP_START`, `SKIP_SETUP`,
+`AUTO_APPLY_SETUP`, and callback overrides (`OAUTH_CALLBACK_*`).
