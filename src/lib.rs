@@ -192,6 +192,7 @@ fn error_output(err: OAuthCardError) -> OAuthCardOutput {
         card: None,
         auth_context: None,
         auth_header: None,
+        access_token: None,
         state_id: None,
         error: Some(err.to_string()),
     }
@@ -392,6 +393,7 @@ fn oauth_output_schema_ir() -> SchemaIr {
             ("can_continue", SchemaIr::Bool),
             ("auth_context", nullable_auth_context_schema()),
             ("auth_header", nullable_auth_header_schema()),
+            ("access_token", nullable_string_schema()),
             ("state_id", nullable_string_schema()),
             ("error", nullable_string_schema()),
         ],
@@ -1011,6 +1013,7 @@ pub fn oauth_output_schema_json() -> Value {
                 "type": ["object", "null"],
                 "additionalProperties": true
             },
+            "access_token": { "type": ["string", "null"] },
             "state_id": { "type": ["string", "null"] },
             "error": { "type": ["string", "null"] }
         },
@@ -1462,6 +1465,8 @@ mod tests {
         assert_eq!(response["status"], "ok");
         assert_eq!(response["can_continue"], true);
         assert_eq!(response["auth_header"]["headers"][0][1], "Bearer abc");
+        // Raw token is surfaced for downstream flow nodes (e.g. an API component).
+        assert_eq!(response["access_token"], "abc");
     }
 
     #[test]

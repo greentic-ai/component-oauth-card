@@ -1,0 +1,60 @@
+pack_id: github-app-pack
+version: 0.1.0
+kind: application
+publisher: Greentic
+components:
+- id: ai.greentic.component-adaptive-card
+  version: 0.1.0
+  world: root:component/root
+  supports:
+  - messaging
+  profiles:
+    default: default
+    supported:
+    - default
+  capabilities:
+    wasi:
+      random: false
+      clocks: false
+    host: {}
+  wasm: components/adaptive-card/component_adaptive_card.wasm
+- id: ai.greentic.component-oauth-card
+  version: 0.1.2
+  world: root:component/root
+  supports:
+  - messaging
+  profiles:
+    default: stateless
+    supported:
+    - stateless
+  capabilities:
+    wasi:
+      random: true
+      clocks: true
+    host: {}
+  wasm: components/oauth-card/component_oauth_card.wasm
+- id: github_api
+  version: 0.1.0
+  world: root:component/root
+  supports:
+  - messaging
+  profiles:
+    default: default
+    supported:
+    - default
+  capabilities:
+    wasi:
+      random: false
+      clocks: false
+    host: {}
+  wasm: components/github_api/github_api.component.wasm
+dependencies: []
+flows:
+- id: main
+  file: flows/main.ygtc
+  tags:
+  - default
+  entrypoints:
+  - default
+assets:
+- path: assets/repo_list_card.json

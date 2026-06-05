@@ -5,9 +5,9 @@ locale: en
 mode: create
 advanced_setup: false
 app_packs:
-- ./packs/oauth-card-pack.gtpack
+- ./github-app-pack
 app_pack_mappings:
-- reference: ./packs/oauth-card-pack.gtpack
+- reference: ./github-app-pack
   scope: global
 extension_providers:
 - oci://ghcr.io/greenticai/greentic-packs/messaging-webchat-gui:latest
@@ -23,9 +23,9 @@ tenant: demo
 team: default
 environment: dev
 apps:
-  ai.greentic.oauth-card:
+  github-app-pack:
     enabled: true
-    pack: ./packs/oauth-card-pack.gtpack
+    pack: ./github-app-pack
     routing:
       messaging:
         default: main

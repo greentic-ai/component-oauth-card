@@ -175,6 +175,10 @@ pub struct OAuthCardOutput {
     pub card: Option<MessageCard>,
     pub auth_context: Option<AuthContext>,
     pub auth_header: Option<AuthHeader>,
+    /// Raw resolved access token, surfaced so downstream flow nodes (e.g. an API
+    /// component) can authenticate without parsing the `auth_header` string.
+    /// Only present when a usable token is available (`status: ok`).
+    pub access_token: Option<String>,
     pub state_id: Option<String>,
     pub error: Option<String>,
 }

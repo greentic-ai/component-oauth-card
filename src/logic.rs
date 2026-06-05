@@ -57,6 +57,7 @@ fn status_card<B: OAuthBackend>(
                 card: Some(card),
                 auth_context: Some(auth_context(input, &token)),
                 auth_header: None,
+                access_token: None,
                 state_id: None,
                 error: None,
             });
@@ -68,6 +69,7 @@ fn status_card<B: OAuthBackend>(
             card: Some(card),
             auth_context: Some(auth_context(input, &token)),
             auth_header: Some(auth_header(&token)),
+            access_token: Some(token.access_token.clone()),
             state_id: None,
             error: None,
         })
@@ -84,6 +86,7 @@ fn status_card<B: OAuthBackend>(
             card: Some(card),
             auth_context: None,
             auth_header: None,
+            access_token: None,
             state_id: None,
             error: None,
         })
@@ -114,6 +117,7 @@ fn start_sign_in<B: OAuthBackend>(
         card: Some(card),
         auth_context: None,
         auth_header: None,
+        access_token: None,
         state_id: Some(state_id),
         error: None,
     })
@@ -147,6 +151,7 @@ fn complete_sign_in<B: OAuthBackend>(
                 card: Some(card),
                 auth_context: None,
                 auth_header: None,
+                access_token: None,
                 state_id: input.state_id.clone(),
                 error: Some(err.to_string()),
             });
@@ -160,6 +165,7 @@ fn complete_sign_in<B: OAuthBackend>(
         card: Some(card),
         auth_context: Some(auth_context(input, &token)),
         auth_header: Some(auth_header(&token)),
+        access_token: Some(token.access_token.clone()),
         state_id: None,
         error: None,
     })
@@ -177,6 +183,7 @@ fn ensure_token<B: OAuthBackend>(
                 card: None,
                 auth_context: Some(auth_context(input, &token)),
                 auth_header: None,
+                access_token: None,
                 state_id: None,
                 error: None,
             });
@@ -187,6 +194,7 @@ fn ensure_token<B: OAuthBackend>(
             card: None,
             auth_context: Some(auth_context(input, &token)),
             auth_header: Some(auth_header(&token)),
+            access_token: Some(token.access_token.clone()),
             state_id: None,
             error: None,
         });
@@ -218,6 +226,7 @@ fn ensure_token<B: OAuthBackend>(
             card: Some(card),
             auth_context: None,
             auth_header: None,
+            access_token: None,
             state_id: Some(state_id),
             error: None,
         })
@@ -234,6 +243,7 @@ fn ensure_token<B: OAuthBackend>(
             card: Some(card),
             auth_context: None,
             auth_header: None,
+            access_token: None,
             state_id: None,
             error: None,
         })
@@ -269,6 +279,7 @@ fn disconnect_card(input: &OAuthCardInput) -> Result<OAuthCardOutput, OAuthCardE
         card: Some(card),
         auth_context: None,
         auth_header: None,
+        access_token: None,
         state_id: None,
         error: None,
     })
@@ -367,12 +378,8 @@ fn refresh_required_card(input: &OAuthCardInput) -> MessageCard {
         Some(format!("Refreshing {} session", input.provider_id)),
         Some("Your access token has expired. Refreshing before this flow continues.".into()),
     );
-    card.actions.push(action(
-        "Retry",
-        OAuthCardMode::EnsureToken,
-        input,
-        None,
-    ));
+    card.actions
+        .push(action("Retry", OAuthCardMode::EnsureToken, input, None));
     card.oauth = Some(OauthCard {
         provider: provider_from_id(&input.provider_id),
         scopes: input.scopes.clone(),
@@ -784,8 +791,7 @@ mod tests {
             exchange_error: None,
             token_error: None,
         };
-        let output =
-            handle(&backend, sample_input(OAuthCardMode::EnsureToken)).expect("ensure ok");
+        let output = handle(&backend, sample_input(OAuthCardMode::EnsureToken)).expect("ensure ok");
         assert_eq!(output.status, OAuthStatus::Ok);
         assert!(output.can_continue);
     }

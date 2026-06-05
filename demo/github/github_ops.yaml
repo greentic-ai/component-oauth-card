@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: GitHub Repo and Issues API
+  version: 1.0.0
+  description: |
+    OpenAPI spec for browsing repositories and working with issues in GitHub.
+    Designed for OAuth access tokens from GitHub.
+servers:
+  - url: https://api.github.com
+security:
+  - githubOAuth:
+      - repo
+      - read:user
+paths:
+  /user/repos:
+    get:
+      operationId: listAuthenticatedUserRepos
+      summary: List repositories for the authenticated user
+      description: Returns repositories visible to the authenticated user.
+      parameters:
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [all, public, private]
+        - name: affiliation
+          in: query
+          schema:
+            type: string
+            example: owner,collaborator,organization_member
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created, updated, pushed, full_name]
+            default: full_name
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: List of repositories.
+
+  /repos/{owner}/{repo}:
+    get:
+      operationId: getRepository
+      summary: Get a repository
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      responses:
+        '200':
+          description: Repository details.
+        '404':
+          description: Repository not found.
+
+  /repos/{owner}/{repo}/contents/{path}:
+    get:
+      operationId: getRepositoryContent
+      summary: Get repository file or directory contents
+      description: Navigate a repository by reading file or directory content at a path.
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: File or directory path within the repository.
+        - name: ref
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Branch, tag, or commit SHA.
+      responses:
+        '200':
+          description: File or directory content.
+        '404':
+          description: Path not found.
+
+  /repos/{owner}/{repo}/contents:
+    get:
+      operationId: listRepositoryRootContents
+      summary: List repository root contents
+      description: Navigate a repository from the root directory.
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - name: ref
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Branch, tag, or commit SHA.
+      responses:
+        '200':
+          description: Root directory content.
+        '404':
+          description: Repository or ref not found.
+
+  /repos/{owner}/{repo}/issues:
+    get:
+      operationId: listRepositoryIssues
+      summary: List issues for a repository
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - name: state
+          in: query
+          schema:
+            type: string
+            enum: [open, closed, all]
+            default: open
+        - name: labels
+          in: query
+          schema:
+            type: string
+          description: Comma-separated label names.
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created, updated, comments]
+            default: created
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: List of issues.
+
+    post:
+      operationId: createRepositoryIssue
+      summary: Create an issue
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                body:
+                  type: string
+                assignees:
+                  type: array
+                  items:
+                    type: string
+                milestone:
+                  type: integer
+                labels:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Issue created.
+        '422':
+          description: Validation failed.
+
+  /repos/{owner}/{repo}/issues/{issue_number}:
+    get:
+      operationId: getRepositoryIssue
+      summary: Get an issue by number
+      parameters:
+        - $ref: '#/components/parameters/owner'
+        - $ref: '#/components/parameters/repo'
+        - name: issue_number
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Issue details.
+        '404':
+          description: Issue not found.
+
+components:
+  parameters:
+    owner:
+      name: owner
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Repository owner login.
+    repo:
+      name: repo
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Repository name.
+
+  securitySchemes:
+    githubOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://github.com/login/oauth/authorize
+          tokenUrl: https://github.com/login/oauth/access_token
+          scopes:
+            repo: Full control of private repositories and read/write for issues.
+            read:user: Read access to user profile data.

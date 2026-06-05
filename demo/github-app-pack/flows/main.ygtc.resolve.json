@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "flow": "main.ygtc",
+  "nodes": {
+    "oauth_status": { "source": { "kind": "local", "path": "../components/oauth-card/component_oauth_card.wasm" }, "digest": "sha256:2b41a6653898cf38048507851e2514e9943ccd642c098d983aed5d5c4cea31ba" },
+    "call_repos": { "source": { "kind": "local", "path": "../components/github_api/github_api.component.wasm" }, "digest": "sha256:a122ee27f7e7118e6030bf7af684e95bb92fc8a88b126e2484b11d9e3a6112a7" },
+    "render_repo_list_card": { "source": { "kind": "local", "path": "../components/adaptive-card/component_adaptive_card.wasm" }, "digest": "sha256:092d799a88475e9c45e48e0d24b7cfd5873d0c2d96f8b6abdfc8275c27bff656" }
+  }
+}

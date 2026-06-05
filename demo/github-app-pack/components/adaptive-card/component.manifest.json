@@ -1,0 +1,69 @@
+{
+  "$schema": "https://greentic-ai.github.io/greentic-component/schemas/v1/component.manifest.schema.json",
+  "id": "ai.greentic.component-adaptive-card",
+  "name": "ai.greentic",
+  "version": "0.1.0",
+  "world": "greentic:component/component@0.6.0",
+  "describe_export": "describe",
+  "operations": [
+    {
+      "name": "card",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  ],
+  "default_operation": "card",
+  "config_schema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": true
+  },
+  "supports": [
+    "messaging"
+  ],
+  "profiles": {
+    "default": "stateless",
+    "supported": [
+      "stateless"
+    ]
+  },
+  "capabilities": {
+    "wasi": {
+      "filesystem": {
+        "mode": "none",
+        "mounts": []
+      },
+      "random": true,
+      "clocks": true
+    },
+    "host": {
+      "messaging": {
+        "inbound": true,
+        "outbound": true
+      },
+      "secrets": {
+        "required": []
+      },
+      "state": {
+        "read": true,
+        "write": true,
+        "delete": true
+      },
+      "telemetry": {
+        "scope": "node"
+      }
+    }
+  },
+  "artifacts": {
+    "component_wasm": "component_adaptive_card.wasm"
+  }
+}
