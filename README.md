@@ -181,16 +181,44 @@ Key env vars are kept compatible with the legacy script:
 `OAUTH_SCOPES_CSV`, `OAUTH_BROKER_CAP_ID`, `SKIP_START`, `SKIP_SETUP`,
 `AUTO_APPLY_SETUP`, and callback overrides (`OAUTH_CALLBACK_*`).
 
-## Demo (GitHub sign-in in webchat-gui)
+## Demo (GitHub OAuth + API in webchat-gui)
 
 A runnable demo bundle lives under [`demo/`](demo/), modelled on `greentic-demo`.
-It renders the OAuth status / sign-in card in webchat-gui in a browser, using
-GitHub because an OAuth App is quick to create. (Switching to Microsoft Entra is
-just a provider/scope swap — see [`pack/flows/main.ygtc`](pack/flows/main.ygtc).)
+The **oauth-card is the main event** (sign-in / status / refresh); a GitHub API
+component generated from an OpenAPI spec then lists your repos, rendered as an
+Adaptive Card in webchat-gui. GitHub is used because an OAuth App is quick to
+create (switching providers is a provider/scope swap in the flow).
 
-**Outcome:** open webchat, the assistant shows a "Connect github account" card;
-completing sign-in flips it to a connected status card, and an expired token
-yields a `needs-refresh` card that the runtime refreshes via the broker.
+The app pack [`demo/github-app-pack`](demo/github-app-pack) bundles three
+components and a flow ([`flows/main.ygtc`](demo/github-app-pack/flows/main.ygtc)):
+
+1. `oauth-card` `ensure-token` (provider `github`) → exposes the resolved
+   `access_token`, or a sign-in / `needs-refresh` card.
+2. `github_api` `list_authenticated_user_repos` — authenticated with that token.
+3. `adaptive-card` renders the repo list for webchat.
+
+### The GitHub component: OpenAPI → wasm → waced
+
+[`demo/github/github_ops.yaml`](demo/github/github_ops.yaml) (7 GitHub ops) is
+turned into a component, then composed with the MCP adapter so it exports the
+Greentic node interface:
+
+```bash
+# OpenAPI -> MCP router wasm (wasix:mcp/router@25.6.18)
+greentic-mcp-gen --input-dir demo/github --output-dir /tmp/ghgen
+cp /tmp/ghgen/github_ops.component.wasm \
+   demo/github-app-pack/routers/github_ops.router.wasm
+
+# router + MCP adapter -> "waced" component exporting greentic:component/node@0.6.0
+wac plug \
+  "$(dirname $(command -v greentic-mcp-gen))/../assets/mcp_adapter_25_06_18.component.wasm" \
+  --plug demo/github-app-pack/routers/github_ops.router.wasm \
+  --output demo/github-app-pack/components/github_api/github_api.component.wasm
+# (use the node@0.6.0 adapter, e.g. greentic-mcp/.../assets/mcp_adapter_25_06_18.component.wasm)
+```
+
+The OAuth token is injected per-call as the tool's `access_token` input (the
+generated component prefixes `Bearer` and resolves the GitHub OAuth2 binding).
 
 **Prerequisites (one-time):**
 
@@ -204,11 +232,13 @@ yields a `needs-refresh` card that the runtime refreshes via the broker.
 **Run:**
 
 ```bash
-# 1. Build the component + provider pack, stage it into the demo bundle
+# 1. Build the oauth-card wasm, generate + compose the GitHub component (above),
+#    then build the app pack
 make wasm
 cp target/wasm32-wasip2/release/component_oauth_card.wasm \
-   pack/components/oauth-card/component_oauth_card.wasm
-greentic-pack build --in pack --gtpack-out demo/packs/oauth-card-pack.gtpack
+   demo/github-app-pack/components/oauth-card/component_oauth_card.wasm
+greentic-pack build --in demo/github-app-pack \
+  --gtpack-out demo/github-app-pack/dist/github-app-pack.gtpack
 
 # 2. Resolve providers (pulls webchat-gui / state / oauth from GHCR) and
 #    validate the bundle is loadable
@@ -216,8 +246,6 @@ gtc setup ./demo --tenant demo --team default --env dev
 
 # 3. Answer the OAuth provider's setup questions (client_id / client_secret).
 #    These belong to the OAuth provider, not the secret-free card component.
-#    Fill the template, then apply it (or run `gtc setup ./demo` interactively to
-#    be prompted for the same fields):
 cp demo/setup.answers.example.json demo/setup.answers.json
 #    edit demo/setup.answers.json: set client_id, client_secret, public_base_url
 gtc setup --answers demo/setup.answers.json ./demo --tenant demo --team default --env dev
@@ -225,8 +253,13 @@ gtc setup --answers demo/setup.answers.json ./demo --tenant demo --team default 
 # 4. Start the runtime with a public tunnel
 greentic-start start --bundle ./demo --ngrok on
 
-# 5. Set the callback URL shown by the runtime in your GitHub OAuth App, then
-#    open webchat in a browser and say "hi" to trigger the card
+# 5. Complete the GitHub sign-in once via the live runner (a flow cannot finish
+#    the OAuth callback itself); this stores the token the broker then resolves:
+PROVIDER=github BUNDLE_DIR=./demo SKIP_START=true \
+OIDC_CLIENT_ID=<id> OIDC_CLIENT_SECRET=<secret> TENANT=demo TEAM=default \
+  ./tools/live_test_oauth_interactive.sh
+
+# 6. Open webchat and message the bot to see the connected card + your repos
 open "http://localhost:8080/v1/web/webchat/demo"
 ```
 
@@ -235,3 +268,8 @@ Secrets are never committed: the bundle declares the provider's secret keys and
 secrets backend) at runtime. The card itself holds no secrets — the operator
 resolves/refreshes the token via the broker and injects it around
 `component.exec` (see "Token refresh" above).
+
+> Note: a Greentic flow cannot complete the OAuth callback on its own, so the
+> live runner performs the one-time sign-in/exchange (step 5). `greentic-pack
+> doctor` reports a `describe()` error for `oauth-card` and `github_api` — the
+> guest-0.4 vs tooling-0.5.6 skew noted above, not a flaw in the demo.
