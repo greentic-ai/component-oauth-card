@@ -180,3 +180,61 @@ Key env vars are kept compatible with the legacy script:
 `OIDC_CLIENT_SECRET_KEY`, `OIDC_AUTH_URL`, `OIDC_TOKEN_URL`,
 `OAUTH_SCOPES_CSV`, `OAUTH_BROKER_CAP_ID`, `SKIP_START`, `SKIP_SETUP`,
 `AUTO_APPLY_SETUP`, and callback overrides (`OAUTH_CALLBACK_*`).
+
+## Demo (Microsoft sign-in in webchat-gui)
+
+A runnable demo bundle lives under [`demo/`](demo/), modelled on `greentic-demo`.
+It renders the Microsoft OAuth status / sign-in card in webchat-gui in a browser.
+
+**Outcome:** open webchat, the assistant shows a "Connect Microsoft account" card;
+completing sign-in flips it to a connected status card, and an expired token
+yields a `needs-refresh` card that the runtime refreshes via the broker.
+
+**Prerequisites (one-time):**
+
+- A Microsoft Entra app registration. Register this redirect URI (substitute the
+  runtime public base URL, e.g. your ngrok URL):
+  `https://<public-base-url>/v1/oauth/ingress/oauth-oidc-executable/demo/default`
+- Scopes: `offline_access openid profile User.Read` (Microsoft v2.0 endpoint).
+
+**Run:**
+
+```bash
+# 1. Build the component + provider pack, stage it into the demo bundle
+make wasm
+cp target/wasm32-wasip2/release/component_oauth_card.wasm \
+   pack/components/oauth-card/component_oauth_card.wasm
+greentic-pack build --in pack --gtpack-out demo/packs/oauth-card-pack.gtpack
+
+# 2. Resolve providers (pulls webchat-gui / state / oauth from GHCR) and
+#    validate the bundle is loadable
+gtc setup ./demo --tenant demo --team default --env dev
+
+# 3. Configure the Microsoft provider + credentials. The oauth provider persists
+#    client_id/client_secret under its provider keys
+#    (tenants/demo/oauth/msgraph/client_id|client_secret); the dev secrets store
+#    lives at demo/.greentic/dev/.dev.secrets.env. The simplest path is to let
+#    the live runner apply the setup answers for you (it builds the Microsoft
+#    provider envelope and seeds the keys):
+PROVIDER=microsoft-graph \
+OIDC_AUTH_URL=https://login.microsoftonline.com/common/oauth2/v2.0/authorize \
+OIDC_TOKEN_URL=https://login.microsoftonline.com/common/oauth2/v2.0/token \
+OAUTH_SCOPES_CSV="offline_access,openid,profile,User.Read" \
+OIDC_CLIENT_ID=<entra-client-id> OIDC_CLIENT_SECRET=<entra-client-secret> \
+TENANT=demo TEAM=default \
+BUNDLE_DIR=./demo SKIP_START=true \
+  ./tools/live_test_oauth_interactive.sh
+
+# 4. Start the runtime with a public tunnel
+greentic-start start --bundle ./demo --ngrok on
+
+# 5. Register the redirect URI shown by the runtime in your Entra app, then open
+#    webchat in a browser and say "hi" to trigger the card
+open "http://localhost:8080/v1/web/webchat/demo"
+```
+
+Secrets are never committed: the bundle declares the provider's secret keys and
+`greentic-start` resolves them from the dev secrets store (or your configured
+secrets backend) at runtime. The card itself holds no secrets — the operator
+resolves/refreshes the token via the broker and injects it around
+`component.exec` (see "Token refresh" above).

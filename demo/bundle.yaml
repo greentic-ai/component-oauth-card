@@ -1,0 +1,41 @@
+schema_version: 1
+bundle_id: oauth-card-demo
+bundle_name: OAuth Card Demo (Microsoft + webchat-gui)
+locale: en
+mode: create
+advanced_setup: false
+app_packs:
+- ./packs/oauth-card-pack.gtpack
+app_pack_mappings:
+- reference: ./packs/oauth-card-pack.gtpack
+  scope: global
+extension_providers:
+- oci://ghcr.io/greenticai/greentic-packs/messaging-webchat-gui:latest
+- oci://ghcr.io/greenticai/greentic-packs/state-memory:latest
+- oci://ghcr.io/greenticai/oauth-oidc-generic-pack:stable
+remote_catalogs: []
+hooks: []
+subscriptions: []
+capabilities: []
+setup_execution_intent: false
+export_intent: false
+tenant: demo
+team: default
+environment: dev
+apps:
+  ai.greentic.oauth-card:
+    enabled: true
+    pack: ./packs/oauth-card-pack.gtpack
+    routing:
+      messaging:
+        default: main
+providers:
+  messaging-webchat-gui:
+    pack: providers/messaging/messaging-webchat-gui.gtpack
+    setup_flow: setup_default
+  state-memory:
+    pack: providers/state/state-memory.gtpack
+    setup_flow: setup_default
+  oauth-oidc-generic:
+    pack: providers/oauth/oauth-oidc-generic.gtpack
+    setup_flow: setup_default
