@@ -1,6 +1,6 @@
 schema_version: 1
 bundle_id: oauth-card-demo
-bundle_name: OAuth Card Demo (Microsoft + webchat-gui)
+bundle_name: OAuth Card Demo (GitHub + webchat-gui)
 locale: en
 mode: create
 advanced_setup: false

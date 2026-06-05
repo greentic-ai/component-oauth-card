@@ -181,21 +181,25 @@ Key env vars are kept compatible with the legacy script:
 `OAUTH_SCOPES_CSV`, `OAUTH_BROKER_CAP_ID`, `SKIP_START`, `SKIP_SETUP`,
 `AUTO_APPLY_SETUP`, and callback overrides (`OAUTH_CALLBACK_*`).
 
-## Demo (Microsoft sign-in in webchat-gui)
+## Demo (GitHub sign-in in webchat-gui)
 
 A runnable demo bundle lives under [`demo/`](demo/), modelled on `greentic-demo`.
-It renders the Microsoft OAuth status / sign-in card in webchat-gui in a browser.
+It renders the OAuth status / sign-in card in webchat-gui in a browser, using
+GitHub because an OAuth App is quick to create. (Switching to Microsoft Entra is
+just a provider/scope swap — see [`pack/flows/main.ygtc`](pack/flows/main.ygtc).)
 
-**Outcome:** open webchat, the assistant shows a "Connect Microsoft account" card;
+**Outcome:** open webchat, the assistant shows a "Connect github account" card;
 completing sign-in flips it to a connected status card, and an expired token
 yields a `needs-refresh` card that the runtime refreshes via the broker.
 
 **Prerequisites (one-time):**
 
-- A Microsoft Entra app registration. Register this redirect URI (substitute the
-  runtime public base URL, e.g. your ngrok URL):
+- A GitHub OAuth App (github.com → Settings → Developer settings → OAuth Apps →
+  New). It takes ~2 minutes and yields a Client ID + Client Secret.
+- Set its **Authorization callback URL** to the runtime ingress (substitute the
+  public base URL `greentic-start` prints, e.g. your ngrok URL):
   `https://<public-base-url>/v1/oauth/ingress/oauth-oidc-executable/demo/default`
-- Scopes: `offline_access openid profile User.Read` (Microsoft v2.0 endpoint).
+- Scopes used by the demo: `repo read:org`.
 
 **Run:**
 
@@ -210,17 +214,16 @@ greentic-pack build --in pack --gtpack-out demo/packs/oauth-card-pack.gtpack
 #    validate the bundle is loadable
 gtc setup ./demo --tenant demo --team default --env dev
 
-# 3. Configure the Microsoft provider + credentials. The oauth provider persists
-#    client_id/client_secret under its provider keys
-#    (tenants/demo/oauth/msgraph/client_id|client_secret); the dev secrets store
-#    lives at demo/.greentic/dev/.dev.secrets.env. The simplest path is to let
-#    the live runner apply the setup answers for you (it builds the Microsoft
-#    provider envelope and seeds the keys):
-PROVIDER=microsoft-graph \
-OIDC_AUTH_URL=https://login.microsoftonline.com/common/oauth2/v2.0/authorize \
-OIDC_TOKEN_URL=https://login.microsoftonline.com/common/oauth2/v2.0/token \
-OAUTH_SCOPES_CSV="offline_access,openid,profile,User.Read" \
-OIDC_CLIENT_ID=<entra-client-id> OIDC_CLIENT_SECRET=<entra-client-secret> \
+# 3. Configure the GitHub provider + credentials. The oauth provider persists
+#    client_id/client_secret under its provider keys; the dev secrets store lives
+#    at demo/.greentic/dev/.dev.secrets.env. The simplest path is to let the live
+#    runner apply the setup answers for you (it builds the provider envelope and
+#    seeds the keys — these are the runner's GitHub defaults):
+PROVIDER=github \
+OIDC_AUTH_URL=https://github.com/login/oauth/authorize \
+OIDC_TOKEN_URL=https://github.com/login/oauth/access_token \
+OAUTH_SCOPES_CSV="repo,read:org" \
+OIDC_CLIENT_ID=<github-client-id> OIDC_CLIENT_SECRET=<github-client-secret> \
 TENANT=demo TEAM=default \
 BUNDLE_DIR=./demo SKIP_START=true \
   ./tools/live_test_oauth_interactive.sh
@@ -228,8 +231,8 @@ BUNDLE_DIR=./demo SKIP_START=true \
 # 4. Start the runtime with a public tunnel
 greentic-start start --bundle ./demo --ngrok on
 
-# 5. Register the redirect URI shown by the runtime in your Entra app, then open
-#    webchat in a browser and say "hi" to trigger the card
+# 5. Set the callback URL shown by the runtime in your GitHub OAuth App, then
+#    open webchat in a browser and say "hi" to trigger the card
 open "http://localhost:8080/v1/web/webchat/demo"
 ```
 

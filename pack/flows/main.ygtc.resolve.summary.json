@@ -2,7 +2,7 @@
   "schema_version": 1,
   "flow": "main.ygtc",
   "nodes": {
-    "microsoft_oauth_card": {
+    "oauth_card": {
       "component_id": "ai.greentic.component-oauth-card",
       "source": {
         "kind": "local",

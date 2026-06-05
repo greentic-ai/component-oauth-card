@@ -2,7 +2,7 @@
   "schema_version": 1,
   "flow": "main.ygtc",
   "nodes": {
-    "microsoft_oauth_card": {
+    "oauth_card": {
       "source": {
         "kind": "local",
         "path": "../components/oauth-card/component_oauth_card.wasm"
