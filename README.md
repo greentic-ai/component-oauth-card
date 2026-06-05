@@ -214,19 +214,13 @@ greentic-pack build --in pack --gtpack-out demo/packs/oauth-card-pack.gtpack
 #    validate the bundle is loadable
 gtc setup ./demo --tenant demo --team default --env dev
 
-# 3. Configure the GitHub provider + credentials. The oauth provider persists
-#    client_id/client_secret under its provider keys; the dev secrets store lives
-#    at demo/.greentic/dev/.dev.secrets.env. The simplest path is to let the live
-#    runner apply the setup answers for you (it builds the provider envelope and
-#    seeds the keys — these are the runner's GitHub defaults):
-PROVIDER=github \
-OIDC_AUTH_URL=https://github.com/login/oauth/authorize \
-OIDC_TOKEN_URL=https://github.com/login/oauth/access_token \
-OAUTH_SCOPES_CSV="repo,read:org" \
-OIDC_CLIENT_ID=<github-client-id> OIDC_CLIENT_SECRET=<github-client-secret> \
-TENANT=demo TEAM=default \
-BUNDLE_DIR=./demo SKIP_START=true \
-  ./tools/live_test_oauth_interactive.sh
+# 3. Answer the OAuth provider's setup questions (client_id / client_secret).
+#    These belong to the OAuth provider, not the secret-free card component.
+#    Fill the template, then apply it (or run `gtc setup ./demo` interactively to
+#    be prompted for the same fields):
+cp demo/setup.answers.example.json demo/setup.answers.json
+#    edit demo/setup.answers.json: set client_id, client_secret, public_base_url
+gtc setup --answers demo/setup.answers.json ./demo --tenant demo --team default --env dev
 
 # 4. Start the runtime with a public tunnel
 greentic-start start --bundle ./demo --ngrok on

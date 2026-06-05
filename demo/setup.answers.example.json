@@ -1,0 +1,26 @@
+{
+  "_comment": "Copy to demo/setup.answers.json, fill client_id/client_secret and public_base_url, then: gtc setup --answers demo/setup.answers.json ./demo --tenant demo --team default --env dev. These are the OAuth PROVIDER's setup questions (the oauth-card component never sees secrets). Interactive `gtc setup ./demo` prompts for the same fields.",
+  "tenant": "demo",
+  "team": "default",
+  "env": "dev",
+  "platform_setup": {
+    "static_routes": {
+      "public_web_enabled": true,
+      "public_surface_policy": "enabled",
+      "public_base_url": "https://<your-public-base-url>"
+    }
+  },
+  "setup_answers": {
+    "oauth-oidc-executable": {
+      "provider_id": "github",
+      "auth_url": "https://github.com/login/oauth/authorize",
+      "token_url": "https://github.com/login/oauth/access_token",
+      "client_id": "<github-oauth-app-client-id>",
+      "client_secret": "<github-oauth-app-client-secret>",
+      "client_id_key": "tenants/demo/oauth/github/client_id",
+      "client_secret_key": "tenants/demo/oauth/github/client_secret",
+      "public_base_url": "https://<your-public-base-url>",
+      "default_scopes": ["repo", "read:org"]
+    }
+  }
+}

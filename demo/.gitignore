@@ -1,3 +1,6 @@
+# Filled setup answers (contains client_id/client_secret) — keep the .example
+/setup.answers.json
+
 # Copied/built pack artifact (produced by `greentic-pack build`)
 /packs/*.gtpack
 
