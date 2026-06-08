@@ -10,8 +10,8 @@ app_pack_mappings:
 - reference: ./github-app-pack
   scope: global
 extension_providers:
-- oci://ghcr.io/greenticai/greentic-packs/messaging-webchat-gui:latest
-- oci://ghcr.io/greenticai/greentic-packs/state-memory:latest
+- oci://ghcr.io/greenticai/packs/messaging/messaging-webchat-gui:stable
+- oci://ghcr.io/greenticai/packs/state/state-memory:stable
 - oci://ghcr.io/greenticai/oauth-oidc-generic-pack:stable
 remote_catalogs: []
 hooks: []
