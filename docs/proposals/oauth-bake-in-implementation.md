@@ -169,3 +169,21 @@ Phase 5 last.
 - Subject resolution: confirm the user/subject is reliably on the invocation
   envelope for the token key in non-chat contexts.
 - Team-context rollout in admin (currently tenant-only) — size before Phase 4.
+
+## TODO — telemetry host (`greentic:telemetry/logging`)
+
+The otpl guest telemetry (`greentic_telemetry::wasm_guest`) makes a component
+**import `greentic:telemetry/logging`**, but no deployed runner wires that host
+import yet — `greentic-runner-host` only provides the older
+`greentic:telemetry/logger@1.0.0`, and `origin/main` of the runner has no
+`telemetry/logging` provider either. A component built with telemetry on
+therefore **fails to instantiate** ("matching implementation was not found in
+the linker").
+
+Because of this, telemetry is now **opt-in / default-off** in the generated
+router (generator templates) and the MCP adapter, so components run on current
+runners. **TODO:** wire the `greentic:telemetry/logging` host in
+`greentic-runner-host` (mirroring the wasi:http/secrets host wiring in
+`pack.rs::register_all`, backed by `greentic_telemetry`), then turn telemetry
+back on (or keep opt-in and enable per build) to get the OAuth lifecycle logs
+(`oauth.sign_in_required` / `token_present` / `card_rendered` / …) flowing.
