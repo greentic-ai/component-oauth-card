@@ -34,3 +34,7 @@ SEMVER_FIX_REPORT.md
 /demo/packs/
 /demo/state/
 *.full.bak
+
+# ignore nested workspace target dirs too
+target/
+/crates/oauth-card-core/Cargo.lock
