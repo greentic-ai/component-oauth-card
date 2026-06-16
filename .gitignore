@@ -28,3 +28,9 @@ SECURITY_FIX_REPORT.md
 DEPENDENCY_FIX_REPORT.md
 semver-output.txt
 SEMVER_FIX_REPORT.md
+
+# generated build artifacts / local demo packs
+/dist/
+/demo/packs/
+/demo/state/
+*.full.bak

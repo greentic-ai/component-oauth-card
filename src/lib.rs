@@ -1,5 +1,6 @@
 #![warn(clippy::unwrap_used, clippy::expect_used)]
 
+mod adaptive;
 mod broker;
 pub mod i18n;
 pub mod i18n_bundle;
@@ -52,11 +53,36 @@ static WASI_TARGET_MARKER: [u8; 13] = *b"wasm32-wasip2";
 #[cfg(target_arch = "wasm32")]
 use greentic_types::cbor::canonical;
 
+// Bindings for the greentic:component@0.6.0 interface family (descriptor /
+// schema / runtime / qa / i18n) that greentic-start 0.5.x binds. See
+// /Users/osoro/Documents/greetic/TODO/component-v0.6.0-family-export.md.
+#[cfg(target_arch = "wasm32")]
+mod bindings {
+    wit_bindgen::generate!({
+        path: "wit",
+        world: "component-v0-v6-v0",
+    });
+}
+
+#[cfg(target_arch = "wasm32")]
+use bindings::exports::greentic::component::{
+    component_descriptor, component_i18n,
+    component_qa::{self, QaMode},
+    component_runtime, component_schema,
+};
+
+/// Implements the `greentic:component@0.6.0` family; all methods delegate to the
+/// same `invoke_json` / schema / qa helpers used by the host (`invoke_json`) path.
 #[cfg(target_arch = "wasm32")]
 struct Component;
 
+/// Legacy `greentic:component/node@0.6.0` export, kept so older runtimes that
+/// resolve components by the `node` interface continue to work.
 #[cfg(target_arch = "wasm32")]
-impl node::Guest for Component {
+struct NodeCompat;
+
+#[cfg(target_arch = "wasm32")]
+impl node::Guest for NodeCompat {
     fn describe() -> node::ComponentDescriptor {
         node::ComponentDescriptor {
             name: COMPONENT_NAME.to_string(),
@@ -113,7 +139,74 @@ impl node::Guest for Component {
 }
 
 #[cfg(target_arch = "wasm32")]
-greentic_interfaces_guest::export_component_v060!(Component);
+fn qa_mode_to_model(mode: QaMode) -> qa::NormalizedMode {
+    match mode {
+        QaMode::Default | QaMode::Setup => qa::NormalizedMode::Setup,
+        QaMode::Update => qa::NormalizedMode::Update,
+        QaMode::Remove => qa::NormalizedMode::Remove,
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl component_descriptor::Guest for Component {
+    fn get_component_info() -> Vec<u8> {
+        encode_cbor(&component_info_json(&json!({ "locale": "en" })))
+    }
+    fn describe() -> Vec<u8> {
+        encode_cbor(&component_describe_struct())
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl component_schema::Guest for Component {
+    fn input_schema() -> Vec<u8> {
+        encode_cbor(&oauth_input_schema_ir())
+    }
+    fn output_schema() -> Vec<u8> {
+        encode_cbor(&oauth_output_schema_ir())
+    }
+    fn config_schema() -> Vec<u8> {
+        encode_cbor(&oauth_config_schema_ir())
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl component_runtime::Guest for Component {
+    fn run(input: Vec<u8>, state: Vec<u8>) -> component_runtime::RunResult {
+        // oauth-card is stateless: run the default op and pass state through.
+        component_runtime::RunResult {
+            output: run_component_cbor(DEFAULT_OPERATION, input),
+            new_state: state,
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl component_qa::Guest for Component {
+    fn qa_spec(mode: QaMode) -> Vec<u8> {
+        encode_cbor(&qa::qa_spec_json(qa_mode_to_model(mode)))
+    }
+    fn apply_answers(mode: QaMode, current_config: Vec<u8>, answers: Vec<u8>) -> Vec<u8> {
+        let payload = json!({
+            "answers": decode_payload(&answers),
+            "current_config": decode_payload(&current_config),
+        });
+        encode_cbor(&qa::apply_answers(qa_mode_to_model(mode), &payload))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl component_i18n::Guest for Component {
+    fn i18n_keys() -> Vec<String> {
+        qa::i18n_keys()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+bindings::export!(Component with_types_in bindings);
+
+#[cfg(target_arch = "wasm32")]
+greentic_interfaces_guest::export_component_v060!(NodeCompat);
 
 pub fn invoke_json(operation: &str, payload: &Value) -> Result<Value, OAuthCardError> {
     match operation {
@@ -136,7 +229,16 @@ fn handle_operation_json(payload: &Value) -> Result<Value, OAuthCardError> {
         .map_err(|err| OAuthCardError::Parse(format!("input json: {err}")))?;
     let backend = broker::InputBroker::from_input(&input);
     let output = logic::handle(&backend, input).unwrap_or_else(error_output);
-    serde_json::to_value(output).map_err(|err| OAuthCardError::Parse(format!("output json: {err}")))
+    let mut value = serde_json::to_value(&output)
+        .map_err(|err| OAuthCardError::Parse(format!("output json: {err}")))?;
+    // Emit an Adaptive Card alongside the channel-agnostic `card` so channels
+    // that only render Adaptive Cards (e.g. webchat-gui) can show the OAuth
+    // card. greentic-start surfaces a node output's `renderedCard` into the
+    // channel's `adaptive_card` slot.
+    if let Some(card) = &output.card {
+        value["renderedCard"] = adaptive::render_adaptive_card(card);
+    }
+    Ok(value)
 }
 
 fn merge_input_with_config(payload: &Value) -> Value {
@@ -156,6 +258,9 @@ fn merge_input_with_config(payload: &Value) -> Value {
             "allow_auto_sign_in",
         );
         copy_if_missing(&mut object, config, "redirect_path", "redirect_path");
+        copy_if_missing(&mut object, config, "auth_url", "auth_url");
+        copy_if_missing(&mut object, config, "client_id", "client_id");
+        copy_if_missing(&mut object, config, "redirect_uri", "redirect_uri");
         copy_if_missing(&mut object, config, "tenant", "tenant");
         copy_if_missing(&mut object, config, "team", "team");
     }
@@ -367,6 +472,9 @@ fn oauth_input_schema_ir() -> SchemaIr {
             ("auth_code", nullable_string_schema()),
             ("allow_auto_sign_in", SchemaIr::Bool),
             ("redirect_path", nullable_string_schema()),
+            ("auth_url", nullable_string_schema()),
+            ("client_id", nullable_string_schema()),
+            ("redirect_uri", nullable_string_schema()),
             ("extra_json", optional_json_object_schema()),
             ("current_token", nullable_token_schema()),
             ("consent_url", nullable_string_schema()),
@@ -390,6 +498,7 @@ fn oauth_output_schema_ir() -> SchemaIr {
                 enum_string_schema(&["ok", "needs-sign-in", "needs-refresh", "error"]),
             ),
             ("card", nullable_message_card_schema()),
+            ("renderedCard", nullable_open_object_schema()),
             ("can_continue", SchemaIr::Bool),
             ("auth_context", nullable_auth_context_schema()),
             ("auth_header", nullable_auth_header_schema()),
@@ -412,6 +521,9 @@ fn oauth_config_schema_ir() -> SchemaIr {
             ("tenant", nullable_string_schema()),
             ("team", nullable_string_schema()),
             ("redirect_path", nullable_string_schema()),
+            ("auth_url", nullable_string_schema()),
+            ("client_id", nullable_string_schema()),
+            ("redirect_uri", nullable_string_schema()),
             ("allow_auto_sign_in", SchemaIr::Bool),
         ],
         &[],
@@ -808,6 +920,18 @@ fn nullable_message_card_schema() -> SchemaIr {
     }
 }
 
+/// Schema for the optional `renderedCard` field: an Adaptive Card document
+/// (free-form object) or null. Adaptive Card payloads are open-ended, so we
+/// allow additional properties rather than enumerate the full schema here.
+fn nullable_open_object_schema() -> SchemaIr {
+    SchemaIr::OneOf {
+        variants: vec![
+            object_schema(vec![], &[], AdditionalProperties::Allow),
+            SchemaIr::Null,
+        ],
+    }
+}
+
 fn oauth_card_schema() -> SchemaIr {
     object_schema(
         vec![
@@ -956,6 +1080,9 @@ pub fn oauth_input_schema_json() -> Value {
                 "default": false
             },
             "redirect_path": { "type": ["string", "null"] },
+            "auth_url": { "type": ["string", "null"] },
+            "client_id": { "type": ["string", "null"] },
+            "redirect_uri": { "type": ["string", "null"] },
             "extra_json": {},
             "current_token": {
                 "type": ["object", "null"],
@@ -999,6 +1126,10 @@ pub fn oauth_output_schema_json() -> Value {
                 "enum": ["ok", "needs-sign-in", "needs-refresh", "error"]
             },
             "card": {
+                "type": ["object", "null"],
+                "additionalProperties": true
+            },
+            "renderedCard": {
                 "type": ["object", "null"],
                 "additionalProperties": true
             },
@@ -1330,6 +1461,46 @@ mod tests {
                 .expect("card text")
                 .contains("flow cannot continue")
         );
+    }
+
+    #[test]
+    fn handle_emits_rendered_adaptive_card_for_sign_in() {
+        let response = invoke_json(
+            DEFAULT_OPERATION,
+            &json!({
+                "mode": "status-card",
+                "provider_id": "github",
+                "subject": "user-1",
+                "scopes": ["repo"]
+            }),
+        )
+        .expect("invoke should succeed");
+
+        // needs-sign-in produces a card, so an Adaptive Card must be rendered
+        // for channels (e.g. webchat) that only understand Adaptive Cards.
+        assert_eq!(response["status"], "needs-sign-in");
+        assert_eq!(response["renderedCard"]["type"], "AdaptiveCard");
+        assert_eq!(response["renderedCard"]["version"], "1.5");
+        assert!(response["renderedCard"]["body"].is_array());
+    }
+
+    #[test]
+    fn handle_omits_rendered_card_when_no_card_present() {
+        // ensure-token with a usable token returns `card: None` (just passes the
+        // token through) -> no renderedCard should be emitted.
+        let response = invoke_json(
+            DEFAULT_OPERATION,
+            &json!({
+                "mode": "ensure-token",
+                "provider_id": "github",
+                "subject": "user-1",
+                "current_token": { "access_token": "abc" }
+            }),
+        )
+        .expect("invoke should succeed");
+
+        assert_eq!(response["status"], "ok");
+        assert!(response.get("renderedCard").is_none());
     }
 
     #[test]

@@ -145,6 +145,19 @@ pub struct OAuthCardInput {
     pub allow_auto_sign_in: bool,
     /// Optional redirect path (defaults to "/oauth/callback/{provider_id}").
     pub redirect_path: Option<String>,
+    /// Provider authorization endpoint, set at setup/config time (e.g.
+    /// `https://github.com/login/oauth/authorize`). When present together with
+    /// `client_id` and no explicit `consent_url`, the card assembles a standard
+    /// OAuth 2.0 authorization-code consent URL itself — keeping it
+    /// provider-agnostic (any provider is just a different `auth_url` +
+    /// `client_id` + `scopes`).
+    pub auth_url: Option<String>,
+    /// Public OAuth client id (NOT a secret — it appears in the authorize URL).
+    /// Combined with `auth_url` to build the consent URL.
+    pub client_id: Option<String>,
+    /// Full redirect/callback URI the provider redirects back to after consent
+    /// (set at setup time to the provider extension's ingress URL).
+    pub redirect_uri: Option<String>,
     /// Provider-specific options forwarded to the broker.
     pub extra_json: Option<serde_json::Value>,
     /// Token already resolved by an upstream OAuth operation.

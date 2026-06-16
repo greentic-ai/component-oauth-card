@@ -102,13 +102,7 @@ fn start_sign_in<B: OAuthBackend>(
         .clone()
         .unwrap_or_else(|| Uuid::new_v4().to_string());
     let redirect_path = redirect_path(input);
-    let consent_url = backend.get_consent_url(
-        &input.provider_id,
-        &input.subject,
-        &input.scopes,
-        &redirect_path,
-        input.extra_json.as_ref().map(|v| v.to_string()),
-    )?;
+    let consent_url = resolve_consent_url(backend, input, &state_id, &redirect_path)?;
     let card = sign_in_card(input, &state_id, &consent_url);
 
     Ok(OAuthCardOutput {
@@ -206,13 +200,7 @@ fn ensure_token<B: OAuthBackend>(
             .clone()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
         let redirect_path = redirect_path(input);
-        let consent_url = backend.get_consent_url(
-            &input.provider_id,
-            &input.subject,
-            &input.scopes,
-            &redirect_path,
-            input.extra_json.as_ref().map(|v| v.to_string()),
-        )?;
+        let consent_url = resolve_consent_url(backend, input, &state_id, &redirect_path)?;
         let card = sign_in_card_with_message(
             input,
             &state_id,
@@ -463,6 +451,87 @@ fn redirect_path(input: &OAuthCardInput) -> String {
         .unwrap_or_else(|| format!("/oauth/callback/{}", input.provider_id))
 }
 
+/// Resolve the consent URL for a sign-in, provider-agnostically.
+///
+/// Precedence:
+/// 1. An explicit `consent_url` (e.g. minted by an upstream OAuth provider op).
+/// 2. A standard OAuth 2.0 authorization-code URL built from `auth_url` +
+///    `client_id` (+ scopes/redirect/state) supplied at setup/config time. This
+///    is the conventional flow that works for any provider without hardcoding.
+/// 3. Otherwise defer to the backend broker.
+fn resolve_consent_url<B: OAuthBackend>(
+    backend: &B,
+    input: &OAuthCardInput,
+    state_id: &str,
+    redirect_path: &str,
+) -> Result<String, OAuthCardError> {
+    if let Some(url) = &input.consent_url {
+        return Ok(url.clone());
+    }
+    if let (Some(auth_url), Some(client_id)) = (&input.auth_url, &input.client_id) {
+        return Ok(build_authorize_url(
+            auth_url,
+            client_id,
+            input.redirect_uri.as_deref(),
+            &input.scopes,
+            state_id,
+        ));
+    }
+    backend.get_consent_url(
+        &input.provider_id,
+        &input.subject,
+        &input.scopes,
+        redirect_path,
+        input.extra_json.as_ref().map(|v| v.to_string()),
+    )
+}
+
+/// Build a conventional OAuth 2.0 authorization-code consent URL. Provider-
+/// agnostic: GitHub, Google, Microsoft, Okta, etc. differ only by `auth_url`,
+/// `client_id`, and `scopes`.
+fn build_authorize_url(
+    auth_url: &str,
+    client_id: &str,
+    redirect_uri: Option<&str>,
+    scopes: &[String],
+    state: &str,
+) -> String {
+    let mut params: Vec<(&str, String)> = vec![
+        ("response_type", "code".to_string()),
+        ("client_id", client_id.to_string()),
+    ];
+    if let Some(redirect) = redirect_uri {
+        params.push(("redirect_uri", redirect.to_string()));
+    }
+    if !scopes.is_empty() {
+        params.push(("scope", scopes.join(" ")));
+    }
+    params.push(("state", state.to_string()));
+
+    let query = params
+        .iter()
+        .map(|(key, value)| format!("{key}={}", percent_encode(value)))
+        .collect::<Vec<_>>()
+        .join("&");
+    let separator = if auth_url.contains('?') { '&' } else { '?' };
+    format!("{auth_url}{separator}{query}")
+}
+
+/// Percent-encode a query-parameter value (RFC 3986 unreserved set passes
+/// through; everything else is `%XX`).
+fn percent_encode(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
 fn auth_context(input: &OAuthCardInput, token: &TokenSet) -> AuthContext {
     AuthContext {
         provider_id: input.provider_id.clone(),
@@ -593,6 +662,9 @@ mod tests {
             auth_code: None,
             allow_auto_sign_in: false,
             redirect_path: None,
+            auth_url: None,
+            client_id: None,
+            redirect_uri: None,
             extra_json: None,
             current_token: None,
             consent_url: None,
@@ -814,6 +886,52 @@ mod tests {
             .token_exchange_resource
             .expect("token_exchange_resource present when connection configured");
         assert_eq!(ter.provider_id.as_deref(), Some("msgraph"));
+    }
+
+    #[test]
+    fn start_sign_in_builds_authorize_url_from_provider_config() {
+        // No consent_url supplied; auth_url + client_id (set at setup) drive a
+        // conventional OAuth2 authorize URL — provider-agnostic.
+        let backend = TestBackend::default();
+        let mut input = sample_input(OAuthCardMode::StartSignIn);
+        input.provider_id = "github".into();
+        input.scopes = vec!["repo".into(), "read:org".into()];
+        input.auth_url = Some("https://github.com/login/oauth/authorize".into());
+        input.client_id = Some("abc123".into());
+        input.redirect_uri = Some("https://host.example/v1/oauth/ingress/p/demo/default".into());
+
+        let output = handle(&backend, input).expect("start ok");
+        let card = output.card.expect("card");
+        let url = card
+            .actions
+            .iter()
+            .find_map(|a| match a {
+                Action::OpenUrl { url, .. } => Some(url.clone()),
+                _ => None,
+            })
+            .expect("connect open_url");
+        assert!(url.starts_with("https://github.com/login/oauth/authorize?"));
+        assert!(url.contains("response_type=code"));
+        assert!(url.contains("client_id=abc123"));
+        assert!(url.contains("scope=repo%20read%3Aorg"));
+        assert!(url.contains("redirect_uri=https%3A%2F%2Fhost.example"));
+        assert!(url.contains("state="));
+    }
+
+    #[test]
+    fn explicit_consent_url_wins_over_built_url() {
+        let backend = TestBackend::default();
+        let mut input = sample_input(OAuthCardMode::StartSignIn);
+        input.consent_url = Some("https://explicit.example/consent".into());
+        input.auth_url = Some("https://github.com/login/oauth/authorize".into());
+        input.client_id = Some("abc123".into());
+
+        let output = handle(&backend, input).expect("start ok");
+        let card = output.card.expect("card");
+        assert!(card.actions.iter().any(|a| matches!(
+            a,
+            Action::OpenUrl { url, .. } if url == "https://explicit.example/consent"
+        )));
     }
 
     #[test]

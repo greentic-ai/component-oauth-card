@@ -2,50 +2,27 @@ id: main
 type: messaging
 start: oauth_status
 nodes:
-  # 1) The OAuth card is the main event: ensure a usable GitHub token for this
-  #    subject. The operator resolves/refreshes via the broker; the card decides
-  #    ok / needs-sign-in / needs-refresh and exposes the raw token as
-  #    `access_token` for downstream nodes. (Token is acquired via the live
-  #    runner; see the repo README "Demo".)
+  # Provider-agnostic sign-in: the card is given only the provider's URLs +
+  # public client_id (set at setup time) and builds the conventional OAuth 2.0
+  # authorization-code consent URL itself. Swap providers by changing auth_url /
+  # client_id / scopes only — no flow logic or component changes. The token
+  # exchange (which needs the client_secret) stays in the OAuth provider
+  # extension; the card never sees a secret.
+  #
+  # Full GitHub repos flow preserved in main.ygtc.full.bak.
   oauth_status:
     component.exec:
       component: "ai.greentic.component-oauth-card"
       operation: oauth_card.handle_message
       input:
-        mode: "ensure-token"
+        mode: "start-sign-in"
         provider_id: "github"
-        subject: "{{in.input.metadata.subject}}"
+        subject: "demo-user"
         scopes:
           - "repo"
           - "read:org"
-        allow_auto_sign_in: true
-    routing:
-      - to: call_repos
-
-  # 2) Call the generated GitHub API component (OpenAPI -> wasm -> wac-composed).
-  #    The token is injected as `access_token` (the tool prefixes "Bearer ").
-  call_repos:
-    component.exec:
-      component: "github_api"
-      operation: list_authenticated_user_repos
-      input:
-        access_token: "{{node.oauth_status.result.access_token}}"
-        visibility: "{{in.input.metadata.visibility}}"
-        per_page: 20
-    routing:
-      - to: render_repo_list_card
-
-  # 3) Render the GitHub result as an Adaptive Card for webchat-gui.
-  render_repo_list_card:
-    component.exec:
-      component: "ai.greentic.component-adaptive-card"
-      operation: card
-      input:
-        card_source: asset
-        card_spec:
-          asset_path: assets/repo_list_card.json
-        payload:
-          request: "{{in.input.metadata}}"
-          result: "{{node.call_repos.result.structured_content}}"
+        auth_url: "https://github.com/login/oauth/authorize"
+        client_id: "REPLACE_WITH_GITHUB_CLIENT_ID"
+        redirect_uri: "http://localhost:8080/v1/oauth/ingress/oauth-oidc-executable/demo/default"
     routing:
       - out: true

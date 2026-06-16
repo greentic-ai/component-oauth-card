@@ -6,6 +6,20 @@
       "default": false,
       "type": "boolean"
     },
+    "auth_url": {
+      "description": "Provider authorization endpoint set at setup time (e.g. https://github.com/login/oauth/authorize). With client_id, the card builds the consent URL itself, provider-agnostically.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "client_id": {
+      "description": "Public OAuth client id (not a secret). Combined with auth_url to build the consent URL.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "default_subject": {
       "description": "Default subject when the invoke payload omits `subject`.",
       "type": [
@@ -18,6 +32,13 @@
       "type": "string"
     },
     "redirect_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "redirect_uri": {
+      "description": "Full redirect/callback URI the provider redirects back to (the provider extension's ingress URL).",
       "type": [
         "string",
         "null"

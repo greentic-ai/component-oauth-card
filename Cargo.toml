@@ -19,7 +19,7 @@ abi_version = "0.6.0"
 package = "greentic:component"
 
 [package.metadata.component.target]
-world = "greentic:component/component@0.6.0"
+world = "greentic:component/component-v0-v6-v0@0.6.0"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -39,3 +39,8 @@ serde_json = "1"
 
 [dev-dependencies]
 serde_json = "1"
+
+# wasm-only: generates the greentic:component@0.6.0 family bindings (the legacy
+# node@0.6.0 export still comes from greentic-interfaces-guest's macro).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wit-bindgen = { version = "0.54", default-features = false, features = ["macros", "realloc"] }
