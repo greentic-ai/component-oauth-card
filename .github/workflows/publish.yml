@@ -1,0 +1,28 @@
+name: Publish
+
+# Publishes the export-free `oauth-card-core` library to crates.io via the org's
+# reusable host-crate-ci workflow on `v*` tags (created by tag-on-version-bump
+# when the version is bumped on main). The `component-oauth-card` crate itself is
+# `publish = false` (it ships as a WASM component / gtpack, not a crates.io lib).
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+jobs:
+  ci:
+    uses: greenticai/.github/.github/workflows/host-crate-ci.yml@main
+    with:
+      toolchain-variant: wasm
+      setup-script: rustup target add wasm32-wasip2

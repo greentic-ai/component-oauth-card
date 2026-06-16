@@ -5,9 +5,12 @@ edition = "2024"
 license = "MIT"
 rust-version = "1.91"
 description = "Greentic component component-oauth-card"
-repository = "https://github.com/component-oauth-card"
+repository = "https://github.com/greenticai/component-oauth-card"
 authors = ["maarten"]
 build = "build.rs"
+# Ships as a WASM component (gtpack), not a crates.io library. Only the
+# export-free `oauth-card-core` lib is published to crates.io.
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
