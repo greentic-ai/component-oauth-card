@@ -31,10 +31,9 @@ SEMVER_FIX_REPORT.md
 
 # generated build artifacts / local demo packs
 /dist/
-/demo/packs/
-/demo/state/
 *.full.bak
 
 # ignore nested workspace target dirs too
 target/
 /crates/oauth-card-core/Cargo.lock
+/demo/
