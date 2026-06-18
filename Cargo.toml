@@ -25,6 +25,10 @@ crate-type = ["cdylib", "rlib"]
 anyhow = "1"
 base64 = "0.22"
 ciborium = "0.2"
+# TODO(oauth-bake-in): unpin greentic-interfaces-guest. Pinned to 0.4.111 because
+# 0.4.113 changed the component-v0-6 world to require a `qa-spec` export
+# (greentic:component/component-qa@0.6.0) this component does not implement yet.
+# Implement that export, then move back to "0.4".
 greentic-interfaces-guest = { version = "=0.4.111", default-features = false, features = ["component-v0-6"] }
 greentic-types = "0.4"
 serde = { version = "1", features = ["derive"] }
