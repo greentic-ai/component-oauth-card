@@ -192,6 +192,7 @@ fn error_output(err: OAuthCardError) -> OAuthCardOutput {
         card: None,
         auth_context: None,
         auth_header: None,
+        access_token: None,
         state_id: None,
         error: Some(err.to_string()),
     }
@@ -371,6 +372,9 @@ fn oauth_input_schema_ir() -> SchemaIr {
             ("consent_url", nullable_string_schema()),
             ("exchanged_token", nullable_token_schema()),
             ("oauth_error", nullable_string_schema()),
+            ("now_unix", nullable_u64_schema()),
+            ("refresh_skew_seconds", nullable_u64_schema()),
+            ("connection_name", nullable_string_schema()),
         ],
         &["mode", "provider_id", "subject"],
         AdditionalProperties::Forbid,
@@ -383,12 +387,13 @@ fn oauth_output_schema_ir() -> SchemaIr {
         vec![
             (
                 "status",
-                enum_string_schema(&["ok", "needs-sign-in", "error"]),
+                enum_string_schema(&["ok", "needs-sign-in", "needs-refresh", "error"]),
             ),
             ("card", nullable_message_card_schema()),
             ("can_continue", SchemaIr::Bool),
             ("auth_context", nullable_auth_context_schema()),
             ("auth_header", nullable_auth_header_schema()),
+            ("access_token", nullable_string_schema()),
             ("state_id", nullable_string_schema()),
             ("error", nullable_string_schema()),
         ],
@@ -552,6 +557,18 @@ fn bounded_string_schema(min: u64, max: u64) -> SchemaIr {
 fn nullable_string_schema() -> SchemaIr {
     SchemaIr::OneOf {
         variants: vec![string_schema(), SchemaIr::Null],
+    }
+}
+
+fn nullable_u64_schema() -> SchemaIr {
+    SchemaIr::OneOf {
+        variants: vec![
+            SchemaIr::Int {
+                min: Some(0),
+                max: Some(9_007_199_254_740_991),
+            },
+            SchemaIr::Null,
+        ],
     }
 }
 
@@ -812,6 +829,12 @@ fn oauth_card_schema() -> SchemaIr {
             ("start_url", nullable_string_schema()),
             ("connection_name", nullable_string_schema()),
             (
+                "token_exchange_resource",
+                SchemaIr::OneOf {
+                    variants: vec![token_exchange_resource_schema(), SchemaIr::Null],
+                },
+            ),
+            (
                 "metadata",
                 SchemaIr::OneOf {
                     variants: vec![optional_json_object_schema(), SchemaIr::Null],
@@ -819,6 +842,18 @@ fn oauth_card_schema() -> SchemaIr {
             ),
         ],
         &["provider", "scopes"],
+        AdditionalProperties::Forbid,
+    )
+}
+
+fn token_exchange_resource_schema() -> SchemaIr {
+    object_schema(
+        vec![
+            ("id", nullable_string_schema()),
+            ("uri", nullable_string_schema()),
+            ("provider_id", nullable_string_schema()),
+        ],
+        &[],
         AdditionalProperties::Forbid,
     )
 }
@@ -935,6 +970,17 @@ pub fn oauth_input_schema_json() -> Value {
             },
             "oauth_error": {
                 "type": ["string", "null"]
+            },
+            "now_unix": {
+                "type": ["integer", "null"],
+                "minimum": 0
+            },
+            "refresh_skew_seconds": {
+                "type": ["integer", "null"],
+                "minimum": 0
+            },
+            "connection_name": {
+                "type": ["string", "null"]
             }
         },
         "required": ["mode", "provider_id", "subject"],
@@ -950,7 +996,7 @@ pub fn oauth_output_schema_json() -> Value {
         "properties": {
             "status": {
                 "type": "string",
-                "enum": ["ok", "needs-sign-in", "error"]
+                "enum": ["ok", "needs-sign-in", "needs-refresh", "error"]
             },
             "card": {
                 "type": ["object", "null"],
@@ -967,6 +1013,7 @@ pub fn oauth_output_schema_json() -> Value {
                 "type": ["object", "null"],
                 "additionalProperties": true
             },
+            "access_token": { "type": ["string", "null"] },
             "state_id": { "type": ["string", "null"] },
             "error": { "type": ["string", "null"] }
         },
@@ -1418,6 +1465,8 @@ mod tests {
         assert_eq!(response["status"], "ok");
         assert_eq!(response["can_continue"], true);
         assert_eq!(response["auth_header"]["headers"][0][1], "Bearer abc");
+        // Raw token is surfaced for downstream flow nodes (e.g. an API component).
+        assert_eq!(response["access_token"], "abc");
     }
 
     #[test]

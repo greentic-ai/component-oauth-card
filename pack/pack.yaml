@@ -1,0 +1,29 @@
+pack_id: ai.greentic.oauth-card
+version: 0.1.0
+kind: application
+publisher: Greentic
+components:
+- id: ai.greentic.component-oauth-card
+  version: 0.1.2
+  world: root:component/root
+  supports:
+  - messaging
+  profiles:
+    default: stateless
+    supported:
+    - stateless
+  capabilities:
+    wasi:
+      random: true
+      clocks: true
+    host: {}
+  wasm: components/oauth-card/component_oauth_card.wasm
+dependencies: []
+flows:
+- id: main
+  file: flows/main.ygtc
+  tags:
+  - default
+  entrypoints:
+  - default
+assets: []

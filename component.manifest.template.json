@@ -234,6 +234,12 @@
               "string",
               "null"
             ]
+          },
+          "access_token": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -262,19 +268,40 @@
         "title": "component-oauth-card component-info output",
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "version": { "type": "string" },
-          "display_name": { "type": "object", "additionalProperties": true },
-          "summary": { "type": "object", "additionalProperties": true },
-          "details": { "type": "object", "additionalProperties": true },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "use_cases": {
             "type": "array",
-            "items": { "type": "object", "additionalProperties": true }
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
           },
           "operations": {
             "type": "array",
-            "items": { "type": "object", "additionalProperties": true }
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
           }
         },
         "required": [
