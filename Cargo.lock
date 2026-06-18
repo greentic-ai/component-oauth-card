@@ -348,9 +348,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces-guest"
-version = "0.4.113"
+version = "0.4.111"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db0ad9c65e52fcc1c55a1d64a83edbaed4154a5ca8b8169fa133cb5fd4ac7627"
+checksum = "4ec03f293f877e84443fc84b90bb0b7c3f1501ff2750cefc39f442946c7f4969"
 dependencies = [
  "greentic-types",
  "wit-bindgen",
