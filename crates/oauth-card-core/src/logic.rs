@@ -279,13 +279,15 @@ fn sign_in_card(input: &OAuthCardInput, state_id: &str, url: &str) -> MessageCar
         state_id,
         url,
         &format!(
-            "Click Connect to sign in as {}{}.",
+            "Click Authorize to sign in as {}{}. I can only move forward to {} after you've \
+             authorized.",
             input.subject,
             input
                 .team
                 .as_ref()
                 .map(|team| format!(" (team {team})"))
-                .unwrap_or_default()
+                .unwrap_or_default(),
+            input.provider_id
         ),
     )
 }
@@ -301,18 +303,13 @@ fn sign_in_card_with_message(
         Some(format!("Connect {} account", input.provider_id)),
         Some(message.to_string()),
     );
+    // Single "Authorize" button (Action.OpenUrl -> consent URL).
     if !url.is_empty() {
         card.actions.push(Action::OpenUrl {
-            title: "Connect".into(),
+            title: "Authorize".into(),
             url: url.into(),
         });
     }
-    card.actions.push(action(
-        "Continue",
-        OAuthCardMode::CompleteSignIn,
-        input,
-        Some(state_id.to_string()),
-    ));
     let (connection_name, token_exchange_resource) = oauth_connection(input);
     card.oauth = Some(OauthCard {
         provider: provider_from_id(&input.provider_id),
