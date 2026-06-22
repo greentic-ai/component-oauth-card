@@ -388,6 +388,7 @@ fn component_describe_struct() -> ComponentDescribe {
         metadata: std::collections::BTreeMap::new(),
         operations,
         config_schema,
+        outcomes: Vec::new(),
     }
 }
 
