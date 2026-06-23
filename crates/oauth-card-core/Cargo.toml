@@ -1,0 +1,20 @@
+[package]
+name = "oauth-card-core"
+version = "0.1.2"
+edition = "2024"
+license = "MIT"
+rust-version = "1.91"
+description = "Provider-agnostic OAuth card decision + Adaptive Card rendering logic (no component exports), shared by the oauth-card component and consumers like the MCP adapter"
+repository = "https://github.com/greenticai/component-oauth-card"
+homepage = "https://github.com/greenticai/component-oauth-card"
+keywords = ["oauth", "adaptive-card", "greentic", "mcp"]
+categories = ["authentication"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = "1"

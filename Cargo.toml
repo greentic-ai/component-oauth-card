@@ -5,9 +5,12 @@ edition = "2024"
 license = "MIT"
 rust-version = "1.91"
 description = "Greentic component component-oauth-card"
-repository = "https://github.com/component-oauth-card"
+repository = "https://github.com/greenticai/component-oauth-card"
 authors = ["maarten"]
 build = "build.rs"
+# Ships as a WASM component (gtpack), not a crates.io library. Only the
+# export-free `oauth-card-core` lib is published to crates.io.
+publish = false
 
 [package.metadata.greentic]
 abi_version = "0.6.0"
@@ -16,26 +19,30 @@ abi_version = "0.6.0"
 package = "greentic:component"
 
 [package.metadata.component.target]
-world = "greentic:component/component@0.6.0"
+world = "greentic:component/component-v0-v6-v0@0.6.0"
+
+[workspace]
+members = ["crates/oauth-card-core"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-anyhow = "1"
-base64 = "0.22"
-ciborium = "0.2"
+oauth-card-core = { path = "crates/oauth-card-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+greentic-types = "0.4"
 # TODO(oauth-bake-in): unpin greentic-interfaces-guest. Pinned to 0.4.111 because
 # 0.4.113 changed the component-v0-6 world to require a `qa-spec` export
 # (greentic:component/component-qa@0.6.0) this component does not implement yet.
 # Implement that export, then move back to "0.4".
 greentic-interfaces-guest = { version = "=0.4.111", default-features = false, features = ["component-v0-6"] }
-greentic-types = "0.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.10"
+ciborium = "0.2"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+anyhow = "1"
+base64 = "0.22"
+sha2 = "0.10"
 
 [build-dependencies]
 greentic-types = "0.4"
@@ -43,3 +50,8 @@ serde_json = "1"
 
 [dev-dependencies]
 serde_json = "1"
+
+# wasm-only: generates the greentic:component@0.6.0 family bindings (the legacy
+# node@0.6.0 export still comes from greentic-interfaces-guest's macro).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wit-bindgen = { version = "0.54", default-features = false, features = ["macros", "realloc"] }

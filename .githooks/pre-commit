@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Pre-commit hook: refresh the lockfile and run the lint gate (mirrors the
+# fmt/clippy parts of ci/local_check.sh). Tests are NOT run here (too slow for
+# every commit) — run them via `ci/local_check.sh` or CI.
+#
+# Enable (per clone — git does not do this automatically):
+#   git config core.hooksPath .githooks
+#
+# Bypass:
+#   PRECOMMIT_SKIP=1 git commit ...   # skip all checks
+#   git commit --no-verify ...        # git's built-in bypass
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+if [ "${PRECOMMIT_SKIP:-0}" = "1" ]; then
+  echo "pre-commit: skipped (PRECOMMIT_SKIP=1)"
+  exit 0
+fi
+
+echo "==> pre-commit: cargo update --workspace"
+cargo update --workspace
+git add Cargo.lock 2>/dev/null || true
+
+echo "==> pre-commit: cargo fmt --all -- --check"
+cargo fmt --all -- --check
+
+echo "==> pre-commit: cargo clippy --workspace --all-targets -- -D warnings"
+cargo clippy --workspace --all-targets -- -D warnings
+
+echo "pre-commit: checks passed (tests run in CI / ci/local_check.sh)."

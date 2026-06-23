@@ -28,6 +28,18 @@ pub fn oauth_config_schema_json() -> Value {
             "redirect_path": {
                 "type": ["string", "null"]
             },
+            "auth_url": {
+                "type": ["string", "null"],
+                "description": "Provider authorization endpoint set at setup time (e.g. https://github.com/login/oauth/authorize). With client_id, the card builds the consent URL itself, provider-agnostically."
+            },
+            "client_id": {
+                "type": ["string", "null"],
+                "description": "Public OAuth client id (not a secret). Combined with auth_url to build the consent URL."
+            },
+            "redirect_uri": {
+                "type": ["string", "null"],
+                "description": "Full redirect/callback URI the provider redirects back to (the provider extension's ingress URL)."
+            },
             "allow_auto_sign_in": {
                 "type": "boolean",
                 "default": false
