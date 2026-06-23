@@ -36,4 +36,6 @@ SEMVER_FIX_REPORT.md
 # ignore nested workspace target dirs too
 target/
 /crates/oauth-card-core/Cargo.lock
+
+# demo lives in greentic-demo; kept local only
 /demo/
