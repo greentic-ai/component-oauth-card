@@ -65,6 +65,30 @@ pub fn qa_spec_json(mode: NormalizedMode) -> JsonValue {
                     "qa.field.redirect_path.help",
                     false,
                 ),
+                connection_question(
+                    "auth_url",
+                    "qa.field.auth_url.label",
+                    "Authorization URL",
+                    "qa.field.auth_url.help",
+                    "Provider OAuth 2.0 authorize endpoint, e.g. https://github.com/login/oauth/authorize",
+                    true,
+                ),
+                connection_question(
+                    "client_id",
+                    "qa.field.client_id.label",
+                    "OAuth client ID (public)",
+                    "qa.field.client_id.help",
+                    "Public OAuth app client id — NOT a secret. Set the matching client SECRET on the OAuth provider extension, not here.",
+                    true,
+                ),
+                connection_question(
+                    "redirect_uri",
+                    "qa.field.redirect_uri.label",
+                    "Redirect / callback URL",
+                    "qa.field.redirect_uri.help",
+                    "Where the provider redirects after consent — the OAuth provider extension's ingress URL.",
+                    false,
+                ),
                 bool_question(
                     "allow_auto_sign_in",
                     "qa.field.allow_auto_sign_in.label",
@@ -109,6 +133,30 @@ pub fn qa_spec_json(mode: NormalizedMode) -> JsonValue {
                     "qa.field.redirect_path.help",
                     false,
                 ),
+                connection_question(
+                    "auth_url",
+                    "qa.field.auth_url.label",
+                    "Authorization URL",
+                    "qa.field.auth_url.help",
+                    "Provider OAuth 2.0 authorize endpoint, e.g. https://github.com/login/oauth/authorize",
+                    false,
+                ),
+                connection_question(
+                    "client_id",
+                    "qa.field.client_id.label",
+                    "OAuth client ID (public)",
+                    "qa.field.client_id.help",
+                    "Public OAuth app client id — NOT a secret. Set the matching client SECRET on the OAuth provider extension, not here.",
+                    false,
+                ),
+                connection_question(
+                    "redirect_uri",
+                    "qa.field.redirect_uri.label",
+                    "Redirect / callback URL",
+                    "qa.field.redirect_uri.help",
+                    "Where the provider redirects after consent — the OAuth provider extension's ingress URL.",
+                    false,
+                ),
                 bool_question(
                     "allow_auto_sign_in",
                     "qa.field.allow_auto_sign_in.label",
@@ -148,6 +196,28 @@ fn text_question(id: &str, label_key: &str, help_key: &str, required: bool) -> Q
         id: id.to_string(),
         label: I18nText::new(label_key, None),
         help: Some(I18nText::new(help_key, None)),
+        error: None,
+        kind: QuestionKind::Text,
+        required,
+        default: None,
+        skip_if: None,
+    }
+}
+
+/// A text question for provider connection config, with inline fallback text so
+/// labels render even before i18n translations are added for these keys.
+fn connection_question(
+    id: &str,
+    label_key: &str,
+    label_fallback: &str,
+    help_key: &str,
+    help_fallback: &str,
+    required: bool,
+) -> Question {
+    Question {
+        id: id.to_string(),
+        label: I18nText::new(label_key, Some(label_fallback.to_string())),
+        help: Some(I18nText::new(help_key, Some(help_fallback.to_string()))),
         error: None,
         kind: QuestionKind::Text,
         required,
@@ -225,6 +295,10 @@ pub fn apply_answers(mode: NormalizedMode, payload: &JsonValue) -> JsonValue {
         apply_text(&answers, "tenant", &mut config);
         apply_text(&answers, "team", &mut config);
         apply_nullable_text(&answers, "redirect_path", &mut config);
+        // Provider-agnostic connection config (public; no secret here).
+        apply_text(&answers, "auth_url", &mut config);
+        apply_text(&answers, "client_id", &mut config);
+        apply_nullable_text(&answers, "redirect_uri", &mut config);
         if let Some(value) = bool_answer(&answers, "allow_auto_sign_in") {
             config.insert("allow_auto_sign_in".to_string(), JsonValue::Bool(value));
         }
@@ -345,11 +419,11 @@ mod tests {
     fn qa_spec_json_contains_expected_questions_for_each_mode() {
         let setup = qa_spec_json(NormalizedMode::Setup);
         assert_eq!(setup["mode"], "setup");
-        assert_eq!(setup["questions"].as_array().expect("array").len(), 7);
+        assert_eq!(setup["questions"].as_array().expect("array").len(), 10);
 
         let update = qa_spec_json(NormalizedMode::Update);
         assert_eq!(update["mode"], "update");
-        assert_eq!(update["questions"].as_array().expect("array").len(), 7);
+        assert_eq!(update["questions"].as_array().expect("array").len(), 10);
 
         let remove = qa_spec_json(NormalizedMode::Remove);
         assert_eq!(remove["mode"], "remove");
@@ -398,6 +472,35 @@ mod tests {
         assert_eq!(value["config"]["redirect_path"], JsonValue::Null);
         assert_eq!(value["config"]["allow_auto_sign_in"], true);
         assert_eq!(value["config"]["scopes"][1], "read:user");
+    }
+
+    #[test]
+    fn apply_answers_setup_captures_connection_config() {
+        let value = apply_answers(
+            NormalizedMode::Setup,
+            &json!({
+                "answers": {
+                    "provider_id": "github",
+                    "auth_url": "https://github.com/login/oauth/authorize",
+                    "client_id": "Ov23liExample",
+                    "redirect_uri": "https://host.example/v1/oauth/ingress/oauth-oidc-executable/demo/default",
+                    "scopes_csv": "repo,read:org"
+                }
+            }),
+        );
+
+        assert_eq!(value["ok"], true);
+        assert_eq!(
+            value["config"]["auth_url"],
+            "https://github.com/login/oauth/authorize"
+        );
+        assert_eq!(value["config"]["client_id"], "Ov23liExample");
+        assert_eq!(
+            value["config"]["redirect_uri"],
+            "https://host.example/v1/oauth/ingress/oauth-oidc-executable/demo/default"
+        );
+        // The card never collects or stores a client secret.
+        assert!(value["config"].get("client_secret").is_none());
     }
 
     #[test]

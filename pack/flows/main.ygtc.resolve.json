@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "flow": "main.ygtc",
+  "nodes": {
+    "oauth_card": {
+      "source": {
+        "kind": "local",
+        "path": "../components/oauth-card/component_oauth_card.wasm"
+      },
+      "digest": "sha256:6fbb4ea9268b6b14e0a1e1da20b73d427fb6f452a4dded1ad15055d4de5eca00"
+    }
+  }
+}

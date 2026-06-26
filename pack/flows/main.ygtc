@@ -1,0 +1,27 @@
+id: main
+type: messaging
+start: oauth_card
+nodes:
+  # Render the standard OAuth status card for a GitHub connection. The operator
+  # resolves the token for this provider + subject (refreshing via the broker
+  # when a refresh token is available) and injects it into the component; the
+  # card decides connected / needs-sign-in / needs-refresh and emits the sign-in
+  # / status card for webchat-gui.
+  #
+  # To target a different provider, change provider_id + scopes (and the broker
+  # provider config), e.g. Microsoft Entra:
+  #   provider_id: microsoft   scopes: [offline_access, openid, profile, User.Read]
+  oauth_card:
+    component.exec:
+      component: ai.greentic.component-oauth-card
+      operation: oauth_card.handle_message
+      input:
+        mode: status-card
+        provider_id: github
+        subject: "user"
+        connection_name: github
+        scopes:
+          - repo
+          - read:org
+    routing:
+      - out: true

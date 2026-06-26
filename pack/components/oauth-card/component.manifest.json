@@ -77,7 +77,7 @@
   "default_operation": "oauth_card.handle_message",
   "describe_export": "describe",
   "hashes": {
-    "component_wasm": "blake3:b18ab161d263e67ab9ce53324f7a8f66f79891fa5dbf46d892799b3d7e539702"
+    "component_wasm": "blake3:60cb135b4febf251d0594f2923b52b80e8c5e36298c66b2ebaab9802c7334561"
   },
   "id": "ai.greentic.component-oauth-card",
   "limits": {
@@ -96,6 +96,12 @@
             "type": "boolean"
           },
           "auth_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connection_name": {
             "type": [
               "string",
               "null"
@@ -133,6 +139,13 @@
             ],
             "type": "string"
           },
+          "now_unix": {
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "oauth_error": {
             "type": [
               "string",
@@ -145,6 +158,13 @@
           "redirect_path": {
             "type": [
               "string",
+              "null"
+            ]
+          },
+          "refresh_skew_seconds": {
+            "minimum": 0,
+            "type": [
+              "integer",
               "null"
             ]
           },
@@ -190,12 +210,6 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "additionalProperties": false,
         "properties": {
-          "access_token": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "auth_context": {
             "additionalProperties": true,
             "type": [
@@ -236,6 +250,7 @@
             "enum": [
               "ok",
               "needs-sign-in",
+              "needs-refresh",
               "error"
             ],
             "type": "string"
@@ -482,6 +497,6 @@
   "supports": [
     "messaging"
   ],
-  "version": "0.1.5",
+  "version": "0.1.2",
   "world": "greentic:component/component@0.6.0"
 }

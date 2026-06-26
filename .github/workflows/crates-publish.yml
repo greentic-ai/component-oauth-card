@@ -1,0 +1,25 @@
+# Publishes the export-free `oauth-card-core` library to crates.io via the org's
+# reusable crates-publish workflow on `v*` tags (created by tag-on-version-bump when
+# the version is bumped on main). `component-oauth-card` itself is `publish = false`.
+# Mirrors the org convention (see greentic-state/greentic-types); ideally also add
+# this repo to REPO_MANIFEST.toml in greenticai/.github so it's sync-maintained.
+name: Publish to crates.io
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: greenticai/.github/.github/workflows/crates-publish.yml@main
+    with:
+      crates: "oauth-card-core"
+    secrets: inherit

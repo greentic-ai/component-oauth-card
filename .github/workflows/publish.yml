@@ -1,0 +1,29 @@
+name: Publish
+
+# Runs the org's reusable host-crate CI (clippy/fmt/test/semver) on every push/PR
+# and on `v*` tags. Publishing the export-free `oauth-card-core` library to
+# crates.io is handled separately by `crates-publish.yml` (the org's reusable
+# crates-publish workflow, on `v*` tags). The `component-oauth-card` crate itself is
+# `publish = false` (it ships as a WASM component / gtpack, not a crates.io lib).
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
+jobs:
+  ci:
+    uses: greenticai/.github/.github/workflows/host-crate-ci.yml@main
+    with:
+      toolchain-variant: wasm
+      setup-script: rustup target add wasm32-wasip2

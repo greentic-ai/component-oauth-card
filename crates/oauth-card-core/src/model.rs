@@ -95,8 +95,25 @@ pub struct OauthCard {
     pub start_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_name: Option<String>,
+    /// Bot Framework OAuthCard `tokenExchangeResource` — when populated, clients
+    /// (Teams/WebChat) may attempt a silent SSO token exchange instead of
+    /// opening the sign-in URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_exchange_resource: Option<TokenExchangeResource>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Value>,
+}
+
+/// Bot Framework `TokenExchangeResource` for single sign-on / silent token
+/// exchange. See learn.microsoft.com OAuthCard.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct TokenExchangeResource {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uri: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -128,6 +145,19 @@ pub struct OAuthCardInput {
     pub allow_auto_sign_in: bool,
     /// Optional redirect path (defaults to "/oauth/callback/{provider_id}").
     pub redirect_path: Option<String>,
+    /// Provider authorization endpoint, set at setup/config time (e.g.
+    /// `https://github.com/login/oauth/authorize`). When present together with
+    /// `client_id` and no explicit `consent_url`, the card assembles a standard
+    /// OAuth 2.0 authorization-code consent URL itself — keeping it
+    /// provider-agnostic (any provider is just a different `auth_url` +
+    /// `client_id` + `scopes`).
+    pub auth_url: Option<String>,
+    /// Public OAuth client id (NOT a secret — it appears in the authorize URL).
+    /// Combined with `auth_url` to build the consent URL.
+    pub client_id: Option<String>,
+    /// Full redirect/callback URI the provider redirects back to after consent
+    /// (set at setup time to the provider extension's ingress URL).
+    pub redirect_uri: Option<String>,
     /// Provider-specific options forwarded to the broker.
     pub extra_json: Option<serde_json::Value>,
     /// Token already resolved by an upstream OAuth operation.
@@ -138,6 +168,16 @@ pub struct OAuthCardInput {
     pub exchanged_token: Option<TokenSet>,
     /// Upstream OAuth operation error to surface in blocking states.
     pub oauth_error: Option<String>,
+    /// Current wall-clock time (Unix epoch seconds), injected by the flow/runtime.
+    /// Used to decide whether `current_token` is expired. When absent, tokens
+    /// are treated as fresh (no clock available -> no refresh decision).
+    pub now_unix: Option<u64>,
+    /// Seconds before `expires_at` at which a token is considered due for
+    /// refresh. Defaults to 60s when omitted.
+    pub refresh_skew_seconds: Option<u64>,
+    /// Bot Framework registered connection name for this provider (OAuthCard
+    /// `connectionName`). Echoed into the rendered oauth card.
+    pub connection_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -148,6 +188,10 @@ pub struct OAuthCardOutput {
     pub card: Option<MessageCard>,
     pub auth_context: Option<AuthContext>,
     pub auth_header: Option<AuthHeader>,
+    /// Raw resolved access token, surfaced so downstream flow nodes (e.g. an API
+    /// component) can authenticate without parsing the `auth_header` string.
+    /// Only present when a usable token is available (`status: ok`).
+    pub access_token: Option<String>,
     pub state_id: Option<String>,
     pub error: Option<String>,
 }
@@ -183,5 +227,9 @@ pub enum OAuthStatus {
     #[default]
     Ok,
     NeedsSignIn,
+    /// A token exists but is expired (or within the refresh skew window). The
+    /// flow should resolve/refresh it via the broker `get-token` op and
+    /// re-invoke the card before continuing.
+    NeedsRefresh,
     Error,
 }
