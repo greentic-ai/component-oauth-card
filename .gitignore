@@ -39,3 +39,7 @@ target/
 
 # demo lives in greentic-demo; kept local only
 /demo/
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore

@@ -482,6 +482,6 @@
   "supports": [
     "messaging"
   ],
-  "version": "0.1.3",
+  "version": "0.1.5",
   "world": "greentic:component/component@0.6.0"
 }

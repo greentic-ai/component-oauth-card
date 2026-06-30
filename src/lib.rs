@@ -360,6 +360,7 @@ fn component_describe_struct() -> ComponentDescribe {
         required_capabilities: vec!["oauth-operation-results".to_string()],
         metadata: std::collections::BTreeMap::new(),
         operations,
+        outcomes: Vec::new(),
         config_schema,
     }
 }
